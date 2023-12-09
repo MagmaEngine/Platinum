@@ -1,17 +1,44 @@
 #ifndef _PHANTOM_H
 #define _PHANTOM_H
 
-#include "enigma.h"
+#ifndef _UINT
+#define _UINT
+typedef unsigned int uint;
+#endif // _UINT
 
-extern void ph_x11_window_create(uint x, uint y, uint w, uint h);
-extern void ph_x11_window_close(void);
+typedef enum {
+	P_DISPLAY_NONE,
+	P_DISPLAY_WINDOWED,
+	P_DISPLAY_FULLSCREEN,
+	P_DISPLAY_WINDOWED_FULLSCREEN,
+} PWindowDisplayType;
 
+typedef enum {
+	P_INTERACT_NONE,
+	P_INTERACT_INPUT,
+	P_INTERACT_INPUT_OUTPUT,
+} PWindowInteractType;
+
+typedef struct {
+	char *name;
+	uint x;
+	uint y;
+	uint width;
+	uint height;
+	PWindowDisplayType display_type;
+	PWindowInteractType interact_type;
+} PWindowSettings;
+
+// X11 systems
 #ifdef _PHANTOM_X11
-
-#define ph_window_create ph_x11_window_create
-#define ph_window_close ph_x11_window_close
+#include "p_x11.h"
+#define p_window_create p_x11_window_create
+#define p_window_close p_x11_window_close
 
 #endif // _PHANTOM_X11
+
+extern DisplayInfo *p_x11_window_create(PWindowSettings ws);
+extern void p_x11_window_close(DisplayInfo *di);
 
 #endif // _PHANTOM_H
 

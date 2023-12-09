@@ -1,14 +1,13 @@
 #include "phantom.h"
+#include <stdlib.h>
 #include <stdio.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 
-Display *dpy;
-Window window;
 
-void ph_x11_window_create(uint x, uint y, uint w, uint h)
+DisplayInfo *p_x11_window_create(PWindowSettings ws)
 {
-	dpy = XOpenDisplay(NULL);
+	Display *dpy = XOpenDisplay(NULL);
 	if (dpy == NULL) {
 		fprintf(stderr, "PHANTOM: ERROR: Cannot open Display!\n");
 		exit(1);
@@ -18,11 +17,10 @@ void ph_x11_window_create(uint x, uint y, uint w, uint h)
 	int num_items;
 	XVisualInfo *vinfo = XGetVisualInfo(dpy, VisualNoMask, NULL, &num_items);
 
-	XSetWindowAttributes attributes = {0};
-	window = XCreateWindow(dpy,
+	Window window = XCreateWindow(dpy,
 			parent,
-			x, y, w, h,
-			0, 0,
+			ws.x, ws.y, ws.width, ws.height,
+			vinfo->depth, 0,
 			InputOutput,
 			vinfo->visual,
 			0, NULL);
@@ -34,11 +32,16 @@ void ph_x11_window_create(uint x, uint y, uint w, uint h)
 		XNextEvent(dpy, &event);
 	}
 	XFree(vinfo);
+
+	DisplayInfo *di;
+	di->dpy = dpy;
+	di->window = window;
+	return di;
 }
 
 
-void ph_x11_window_close(void)
+void p_x11_window_close(DisplayInfo *di)
 {
-	XDestroyWindow(dpy, window);
-	XCloseDisplay(dpy);
+	XDestroyWindow(di->dpy, di->window);
+	XCloseDisplay(di->dpy);
 }
