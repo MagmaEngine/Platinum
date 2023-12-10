@@ -6,6 +6,6 @@
 typedef struct {
 	Display *dpy;
 	Window window;
-} DisplayInfo;
+} PDisplayInfo;
 
 #endif // _P_X11_INTERNAL
