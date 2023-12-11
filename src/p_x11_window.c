@@ -42,6 +42,10 @@ PDisplayInfo *p_x11_window_create(PWindowSettings ws)
 			vinfo->visual,
 			0, NULL);
 
+	PDisplayInfo *di = malloc(sizeof *di);
+	di->dpy = dpy;
+	di->window = window;
+
 	int x, y, w, h;
 	switch (ws.display_type)
 	{
@@ -63,7 +67,7 @@ PDisplayInfo *p_x11_window_create(PWindowSettings ws)
 			w = DisplayWidth(dpy, scr);
 			h = DisplayHeight(dpy, scr);
 
-			p_x11_window_fullscreen(dpy, window, 1);
+			p_x11_window_fullscreen(di);
 		break;
 	}
 	XMoveResizeWindow(dpy, window, x, y, w, h);
@@ -78,9 +82,6 @@ PDisplayInfo *p_x11_window_create(PWindowSettings ws)
 	}
 	XFree(vinfo);
 
-	PDisplayInfo *di;
-	di->dpy = dpy;
-	di->window = window;
 	return di;
 }
 
@@ -90,9 +91,9 @@ void p_x11_window_close(PDisplayInfo *di)
 	XCloseDisplay(di->dpy);
 }
 
-void p_x11_window_fullscreen(Display *dpy, Window win, uint i)
+void p_x11_window_fullscreen(PDisplayInfo *di)
 {
-	Atom atoms[2] = { XInternAtom(dpy, "_NET_WM_STATE_FULLSCREEN", False), None };
-	XChangeProperty(dpy, win, XInternAtom(dpy, "_NET_WM_STATE", False),
+	Atom atoms[2] = { XInternAtom(di->dpy, "_NET_WM_STATE_FULLSCREEN", False), None };
+	XChangeProperty(di->dpy, di->window, XInternAtom(di->dpy, "_NET_WM_STATE", False),
 			XA_ATOM, 32, PropModeReplace, (unsigned char *)atoms, 1);
 }

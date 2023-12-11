@@ -25,15 +25,21 @@ typedef struct {
 	uint height;
 	PWindowDisplayType display_type;
 	PWindowInteractType interact_type;
+	uint framerate;
 } PWindowSettings;
 
 // X11 systems
 #ifdef _PHANTOM_X11
 
 #include "p_x11.h"
+
 #define p_window_create p_x11_window_create
 #define p_window_close p_x11_window_close
 #define p_window_fullscreen p_x11_window_fullscreen
+
+PDisplayInfo *p_x11_window_create(PWindowSettings ws);
+void p_x11_window_close(PDisplayInfo *di);
+void p_x11_window_fullscreen(PDisplayInfo *di);
 
 #endif
 
@@ -45,12 +51,19 @@ typedef struct {
 // Windows systems
 #ifdef _PHANTOM_WIN32
 
+#include "p_win32.h"
+
+#define p_window_create p_win32_window_create
+#define p_window_close p_win32_window_close
+#define p_window_fullscreen p_win32_window_fullscreen
+
+PDisplayInfo *p_win32_window_create(PWindowSettings ws);
+void p_win32_window_close(PDisplayInfo *di);
+void p_win32_window_fullscreen(PDisplayInfo *di);
+
 #endif // _PHANTOM_WIN32
 
 
-PDisplayInfo *p_x11_window_create(PWindowSettings ws);
-void p_x11_window_close(PDisplayInfo *di);
-void p_x11_window_fullscreen(Display *dpy, Window win, uint i);
 
 #endif // _PHANTOM_H
 
