@@ -46,6 +46,14 @@ void p_x11_window_fullscreen(PDisplayInfo *di);
 // Wayland systems
 #ifdef _PHANTOM_WAYLAND
 
+#define p_window_create p_wayland_window_create
+#define p_window_close p_wayland_window_close
+#define p_window_fullscreen p_wayland_window_fullscreen
+
+PDisplayInfo *p_wayland_window_create(PWindowSettings ws);
+void p_wayland_window_close(PDisplayInfo *di);
+void p_wayland_window_fullscreen(PDisplayInfo *di);
+
 #endif // _PHANTOM_WAYLAND
 
 // Windows systems

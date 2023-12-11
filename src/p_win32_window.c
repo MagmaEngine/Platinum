@@ -17,44 +17,8 @@ PDisplayInfo *p_win32_window_create(PWindowSettings ws)
 		exit(1);
 	}
 
-	uint class;
-	switch (ws.interact_type)
-	{
-		case P_INTERACT_INPUT:
-		break;
-
-		case P_INTERACT_INPUT_OUTPUT:
-		default:
-		break;
-	}
-
 	PDisplayInfo *di = malloc(sizeof *di);
 	di->hwnd = hwnd;
-
-	int x, y, w, h;
-	switch (ws.display_type)
-	{
-		case P_DISPLAY_WINDOWED:
-			x = ws.x;
-			y = ws.y;
-			w = ws.width;
-			h = ws.height;
-		break;
-		case P_DISPLAY_WINDOWED_FULLSCREEN:
-			x = 0;
-			y = 0;
-			//w = DisplayWidth(dpy, scr);
-			//h = DisplayHeight(dpy, scr);
-		break;
-		case P_DISPLAY_FULLSCREEN:
-			x = 0;
-			y = 0;
-			//hw = DisplayWidth(dpy, scr);
-			//h = DisplayHeight(dpy, scr);
-
-			p_win32_window_fullscreen(di);
-		break;
-	}
 
 	return di;
 }
