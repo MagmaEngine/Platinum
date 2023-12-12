@@ -4,8 +4,6 @@
 #include <string.h>
 #include <xcb/xcb.h>
 
-void LinuxToggleFullscreen(PDisplayInfo *di);
-
 PDisplayInfo *p_x11_window_create(PWindowSettings *ws)
 {
 	// Create an XCB connection and window
