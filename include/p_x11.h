@@ -1,11 +1,12 @@
 #ifndef _P_X11_INTERNAL
 #define _P_X11_INTERNAL
 
-#include <X11/Xlib.h>
+#include <xcb/xcb.h>
 
 typedef struct {
-	Display *dpy;
-	Window window;
+	xcb_connection_t *connection;
+	xcb_screen_t *screen;
+	xcb_window_t window;
 } PDisplayInfo;
 
 #endif // _P_X11_INTERNAL

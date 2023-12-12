@@ -36,10 +36,16 @@ typedef struct {
 #define p_window_create p_x11_window_create
 #define p_window_close p_x11_window_close
 #define p_window_fullscreen p_x11_window_fullscreen
+#define p_window_windowed_fullscreen p_x11_window_windowed_fullscreen
+#define p_window_windowed p_x11_window_windowed
 
-PDisplayInfo *p_x11_window_create(PWindowSettings ws);
+PDisplayInfo *p_x11_window_create(PWindowSettings *ws);
 void p_x11_window_close(PDisplayInfo *di);
-void p_x11_window_fullscreen(PDisplayInfo *di);
+
+// Set window display based on display_type
+void p_x11_window_fullscreen(PDisplayInfo *di, PWindowSettings *ws);
+void p_x11_window_windowed_fullscreen(PDisplayInfo *di, PWindowSettings *ws);
+void p_x11_window_windowed(PDisplayInfo *di, PWindowSettings *ws);
 
 #endif
 
@@ -50,9 +56,9 @@ void p_x11_window_fullscreen(PDisplayInfo *di);
 #define p_window_close p_wayland_window_close
 #define p_window_fullscreen p_wayland_window_fullscreen
 
-PDisplayInfo *p_wayland_window_create(PWindowSettings ws);
+PDisplayInfo *p_wayland_window_create(PWindowSettings *ws);
 void p_wayland_window_close(PDisplayInfo *di);
-void p_wayland_window_fullscreen(PDisplayInfo *di);
+void p_wayland_window_fullscreen(PDisplayInfo *di, PWindowSettings *ws);
 
 #endif // _PHANTOM_WAYLAND
 
@@ -65,9 +71,9 @@ void p_wayland_window_fullscreen(PDisplayInfo *di);
 #define p_window_close p_win32_window_close
 #define p_window_fullscreen p_win32_window_fullscreen
 
-PDisplayInfo *p_win32_window_create(PWindowSettings ws);
+PDisplayInfo *p_win32_window_create(PWindowSettings *ws);
 void p_win32_window_close(PDisplayInfo *di);
-void p_win32_window_fullscreen(PDisplayInfo *di);
+void p_win32_window_fullscreen(PDisplayInfo *di, PWindowSettings *ws);
 
 #endif // _PHANTOM_WIN32
 
