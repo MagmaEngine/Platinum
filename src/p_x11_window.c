@@ -133,6 +133,12 @@ void p_x11_window_windowed_fullscreen(PDisplayInfo *di, PWindowSettings *ws)
 		ws->y = 0;
 		ws->width = di->screen->width_in_pixels;
 		ws->height = di->screen->height_in_pixels;
+
+		// resize
+		uint32_t params[4] = {ws->x, ws->y, ws->width, ws->height};
+		xcb_configure_window(di->connection, di->window,
+				XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y | XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT,
+				params);
 	} else {
 		fprintf(stderr, "Unable to make fullscreen\n");
 		exit(1);
@@ -165,6 +171,12 @@ void p_x11_window_windowed(PDisplayInfo *di, PWindowSettings *ws)
 		ws->y = di->screen->height_in_pixels/4;
 		ws->width = di->screen->width_in_pixels/2;
 		ws->height = di->screen->height_in_pixels/2;
+
+		// resize
+		uint32_t params[4] = {ws->x, ws->y, ws->width, ws->height};
+		xcb_configure_window(di->connection, di->window,
+				XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y | XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT,
+				params);
 	} else {
 		fprintf(stderr, "Unable to make fullscreen\n");
 		exit(1);
