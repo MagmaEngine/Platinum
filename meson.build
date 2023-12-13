@@ -1,14 +1,20 @@
-phantom_srcs = files('src/p_linux_events.c')
+phantom_srcs = files()
 
 phantom_deps = [
   dep_libenigma,
   dep_vulkan,
   ]
 
-if build_phantom == 'windows'
-else
+
+message(host_machine.system())
+
+## Phantom build setup
+# Check OS
+if target_os == 'windows'
+elif target_os == 'linux'
   phantom_srcs += [
     files('src/p_linux_events.c'),
+    files('src/p_linux_app.c'),
     ]
   phantom_deps += [
     dep_evdev,
@@ -16,18 +22,17 @@ else
     ]
 endif
 
-## Phantom build setup
-# Check for Windows
-if build_phantom == 'windows'
+# Check Display
+if target_display == 'windows'
   phantom_srcs += [
     files('src/p_win32_window.c'),
   ]
-elif build_phantom == 'x11'
+elif target_display == 'x11'
   phantom_deps += dep_x11
   phantom_srcs += [
     files('src/p_x11_window.c'),
   ]
-elif build_phantom == 'wayland'
+elif target_display == 'wayland'
   phantom_deps += dep_wayland
   phantom_srcs += [
     files('src/p_wayland_window.c'),
