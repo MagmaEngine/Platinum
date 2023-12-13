@@ -71,7 +71,7 @@ PDisplayInfo *p_x11_window_create(PWindowSettings *ws)
 
 void p_x11_window_close(PDisplayInfo *di)
 {
-    xcb_unmap_window(di->connection, di->window);
+	xcb_unmap_window(di->connection, di->window);
 	xcb_disconnect(di->connection);
 	free(di);
 }
@@ -94,7 +94,7 @@ void p_x11_window_fullscreen(PDisplayInfo *di, PWindowSettings *ws)
 				XCB_ATOM_ATOM, 32, 1, &(reply_type_normal->atom));
 		free(reply_type);
 		free(reply_type_normal);
-        xcb_change_property(di->connection, XCB_PROP_MODE_REPLACE, di->window, reply_state->atom,
+		xcb_change_property(di->connection, XCB_PROP_MODE_REPLACE, di->window, reply_state->atom,
 				XCB_ATOM_ATOM, 32, 1, &(reply_state_fullscreen->atom));
 		free(reply_state);
 		free(reply_state_fullscreen);
@@ -103,7 +103,7 @@ void p_x11_window_fullscreen(PDisplayInfo *di, PWindowSettings *ws)
 		fprintf(stderr, "Unable to make fullscreen\n");
 		exit(1);
 	}
-    xcb_unmap_window(di->connection, di->window);
+	xcb_unmap_window(di->connection, di->window);
 	xcb_map_window(di->connection, di->window);
 	xcb_flush(di->connection);
 }
@@ -150,7 +150,7 @@ void p_x11_window_windowed_fullscreen(PDisplayInfo *di, PWindowSettings *ws)
 		fprintf(stderr, "Unable to make windowed fullscreen\n");
 		exit(1);
 	}
-    xcb_unmap_window(di->connection, di->window);
+	xcb_unmap_window(di->connection, di->window);
 	xcb_map_window(di->connection, di->window);
 	xcb_flush(di->connection);
 }
@@ -194,7 +194,7 @@ void p_x11_window_windowed(PDisplayInfo *di, PWindowSettings *ws)
 		fprintf(stderr, "Unable to make windowed\n");
 		exit(1);
 	}
-    xcb_unmap_window(di->connection, di->window);
+	xcb_unmap_window(di->connection, di->window);
 	xcb_map_window(di->connection, di->window);
 	xcb_flush(di->connection);
 }
