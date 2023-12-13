@@ -49,6 +49,8 @@ void p_x11_window_windowed(PDisplayInfo *di, PWindowSettings *ws);
 
 #endif
 
+void p_udev_init(void);
+
 // Wayland systems
 #ifdef _PHANTOM_WAYLAND
 
