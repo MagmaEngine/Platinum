@@ -109,8 +109,6 @@ void p_wayland_window_windowed(PDisplayInfo *display_info, PWindowSettings *wind
 // Linux systems
 #ifdef _PHANTOM_LINUX
 
-struct udev *udev;
-
 /**
  * PDeviceManager
  *
