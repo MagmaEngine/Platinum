@@ -109,6 +109,8 @@ void p_wayland_window_windowed(PDisplayInfo *display_info, PWindowSettings *wind
 // Linux systems
 #ifdef _PHANTOM_LINUX
 
+struct udev *udev;
+
 /**
  * PDeviceManager
  *
@@ -116,10 +118,9 @@ void p_wayland_window_windowed(PDisplayInfo *display_info, PWindowSettings *wind
  * TODO: use me
  */
 typedef struct {
-	EDynarr udevs;
-	EDynarr udev_monitors;
-	EDynarr libevs;
-	EDynarr libev_uinputs;
+	EDynarr *udev_monitors;
+	EDynarr *libevs;
+	EDynarr *libev_uinputs;
 } PDeviceManager;
 
 /**
@@ -131,7 +132,7 @@ typedef struct {
 typedef struct {
 	PWindowSettings *window_settings;
 	PDisplayInfo *display_info;
-	PDeviceManager input_manager;
+	PDeviceManager *input_manager;
 } PAppInstance;
 
 #define p_event_init p_linux_event_init
@@ -141,10 +142,10 @@ typedef struct {
 #define p_app_deinit p_linux_app_deinit
 
 PAppInstance *p_linux_app_init(PWindowRequest *window_request);
-PDeviceManager p_linux_event_init(void);
+PDeviceManager *p_linux_event_init(void);
 
 void p_linux_app_deinit(PAppInstance *app_instance);
-void p_linux_event_deinit(PDeviceManager input_manager);
+void p_linux_event_deinit(PDeviceManager *input_manager);
 
 #endif
 

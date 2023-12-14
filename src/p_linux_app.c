@@ -15,7 +15,6 @@ PAppInstance *p_linux_app_init(PWindowRequest *window_request)
 
 	p_window_create(*window_request, app_instance->display_info, app_instance->window_settings);
 	app_instance->input_manager = p_event_init();
-	app_instance->input_manager = p_event_init();
 	return app_instance;
 }
 
