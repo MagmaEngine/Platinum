@@ -62,6 +62,8 @@ void p_x11_window_create(PAppInstance *app_instance, const PWindowRequest window
 	window_settings->display_type = window_request.display_type;
 	window_settings->interact_type = window_request.interact_type;
 	window_settings->display_info = display_info;
+	window_settings->event_calls = calloc(1, sizeof *window_settings->event_calls);
+	memcpy(window_settings->event_calls, &window_request.event_calls, sizeof *window_settings->event_calls);
 
 	// creates the window
 	xcb_create_window(
@@ -116,6 +118,7 @@ void p_x11_window_create(PAppInstance *app_instance, const PWindowRequest window
 	// Start the window event manager
 	pthread_t thread_xcb_event_manager;
 	pthread_create(&thread_xcb_event_manager, NULL, p_x11_window_event_manage, (void *)window_settings);
+	//pthread_detach(thread_xcb_event_manager);
 	pthread_join(thread_xcb_event_manager, NULL);
 }
 
@@ -144,6 +147,7 @@ void p_x11_window_close(PAppInstance *app_instance, PWindowSettings *window_sett
 		xcb_unmap_window(display_info->connection, display_info->window);
 		xcb_disconnect(display_info->connection);
 		free(window_settings->display_info);
+		free(window_settings->event_calls);
 		free(window_settings->name);
 		e_dynarr_remove_unordered(app_instance->window_settings, index);
 	}
@@ -161,8 +165,9 @@ void *p_x11_window_event_manage(void *args)
 	// unpack args
 	PWindowSettings *window_settings = (PWindowSettings *)args;
 	PDisplayInfo *display_info = window_settings->display_info;
+	PEventCalls *event_calls = window_settings->event_calls;
 
-	uint window_alive = 1;
+	bool window_alive = true;
 
 	while (window_alive) {
 		xcb_generic_event_t *event = xcb_wait_for_event(display_info->connection);
@@ -170,88 +175,99 @@ void *p_x11_window_event_manage(void *args)
 		if (event)
 		{
 			switch (event->response_type & ~0x80) {
+				// TODO: experiment with capturing mouse and keyboard
 				case XCB_EXPOSE:
 				{
 					xcb_expose_event_t *expose_event = (xcb_expose_event_t *)event;
 					// TODO: redraw (only new part?)
-					printf("EVENT: XCB_EXPOSE\n");
+					if (event_calls->enable_expose && event_calls->expose != NULL)
+						event_calls->expose(expose_event);
 					break;
 				}
 				case XCB_CONFIGURE_NOTIFY:
 				{
-					xcb_configure_notify_event_t *config_event = (xcb_configure_notify_event_t *)event;
+					xcb_configure_notify_event_t *config_notify_event = (xcb_configure_notify_event_t *)event;
 					// TODO: Update window_settings
-					printf("EVENT: XCB_CONFIGURE_NOTIFY\n");
+					if (event_calls->enable_configure && event_calls->configure != NULL)
+						event_calls->configure(config_notify_event);
 					break;
 				}
 				case XCB_PROPERTY_NOTIFY:
 				{
-					xcb_property_notify_event_t *property_event = (xcb_property_notify_event_t *)event;
+					xcb_property_notify_event_t *property_notify_event = (xcb_property_notify_event_t *)event;
 					// TODO: Update window_settings
-					printf("EVENT: XCB_PROPERTY_NOTIFY\n");
+					if (event_calls->enable_property && event_calls->property != NULL)
+						event_calls->property(property_notify_event);
 					break;
 				}
 				case XCB_CLIENT_MESSAGE:
 				{
 					xcb_client_message_event_t *message_event = (xcb_client_message_event_t *)event;
 					// TODO:
-					printf("EVENT: XCB_CLIENT_MESSAGE\n");
+					if (event_calls->enable_client && event_calls->client != NULL)
+						event_calls->client(message_event);
 					break;
 				}
 				case XCB_FOCUS_IN:
 				{
 					xcb_focus_in_event_t *focus_in_event = (xcb_focus_in_event_t *)event;
-					printf("EVENT: XCB_FOCUS_IN\n");
 					// TODO:
+					if (event_calls->enable_focus_in && event_calls->focus_in != NULL)
+						event_calls->focus_in(focus_in_event);
 					break;
 				}
 				case XCB_FOCUS_OUT:
 				{
 					xcb_focus_out_event_t *focus_out_event = (xcb_focus_out_event_t *)event;
-					printf("EVENT: XCB_FOCUS_OUT\n");
 					// TODO:
+					if (event_calls->enable_focus_out && event_calls->focus_out != NULL)
+						event_calls->focus_out(focus_out_event);
 					break;
 				}
 				case XCB_ENTER_NOTIFY:
 				{
 					xcb_enter_notify_event_t *enter_notify_event = (xcb_enter_notify_event_t *)event;
 					// TODO:
-					printf("EVENT: XCB_ENTER_NOTIFY\n");
+					if (event_calls->enable_enter && event_calls->enter != NULL)
+						event_calls->enter(enter_notify_event);
 					break;
 				}
 				case XCB_LEAVE_NOTIFY:
 				{
 					xcb_leave_notify_event_t *leave_notify_event = (xcb_leave_notify_event_t *)event;
 					// TODO:
-					printf("EVENT: XCB_LEAVE_NOTIFY\n");
+					if (event_calls->enable_leave && event_calls->leave != NULL)
+						event_calls->leave(leave_notify_event);
 					break;
 				}
 				case XCB_MAP_NOTIFY:
 				{
 					xcb_map_notify_event_t *map_notify_event = (xcb_map_notify_event_t *)event;
 					// TODO: mimimize/maximize? tell engine to go active?
-					printf("EVENT: XCB_MAP_NOTIFY\n");
+					if (event_calls->enable_map && event_calls->map != NULL)
+						event_calls->map(map_notify_event);
 					break;
 				}
 				case XCB_UNMAP_NOTIFY:
 				{
 					xcb_unmap_notify_event_t *unmap_notify_event = (xcb_unmap_notify_event_t *)event;
 					// TODO: mimimize/maximize? tell engine to go dormant?
-					printf("EVENT: XCB_UNMAP_NOTIFY\n");
+					if (event_calls->enable_unmap && event_calls->unmap != NULL)
+						event_calls->unmap(unmap_notify_event);
 					break;
 				}
 				case XCB_DESTROY_NOTIFY:
 				{
-					xcb_destroy_notify_event_t *destroy_event = (xcb_destroy_notify_event_t *)event;
-					window_alive = 0;
+					xcb_destroy_notify_event_t *destroy_notify_event = (xcb_destroy_notify_event_t *)event;
+					window_alive = false;
 					// TODO: handle errors
-					printf("EVENT: XCB_DESTROY_NOTIFY\n");
+					if (event_calls->enable_destroy && event_calls->destroy != NULL)
+						event_calls->destroy(destroy_notify_event);
 					break;
 				}
-				// ... other cases for different event types ...
 			}
 		} else {
-			window_alive = 0;
+			window_alive = false;
 		}
 		free(event);
 	}

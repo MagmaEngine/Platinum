@@ -8,22 +8,53 @@
 typedef unsigned int uint;
 #endif // _UINT
 
-typedef enum {
+enum PWindowDisplayType {
 	P_DISPLAY_WINDOWED,
 	P_DISPLAY_FULLSCREEN,
 	P_DISPLAY_WINDOWED_FULLSCREEN,
-} PWindowDisplayType;
+};
 
-typedef enum {
+enum PWindowInteractType {
 	P_INTERACT_INPUT,
 	P_INTERACT_INPUT_OUTPUT,
-} PWindowInteractType;
+};
 
 typedef struct PAppInstance PAppInstance;
 typedef struct PDeviceManager PDeviceManager;
 typedef struct PDisplayInfo PDisplayInfo;
+typedef struct PEventCalls PEventCalls;
 typedef struct PWindowRequest PWindowRequest;
 typedef struct PWindowSettings PWindowSettings;
+
+/**
+ * PEventCalls
+ *
+ * This struct is used to set user-based functionality onto events from the window manager
+ */
+struct PEventCalls {
+	bool enable_expose;
+	bool enable_configure;
+	bool enable_property;
+	bool enable_client;
+	bool enable_focus_in;
+	bool enable_focus_out;
+	bool enable_enter;
+	bool enable_leave;
+	bool enable_map;
+	bool enable_unmap;
+	bool enable_destroy;
+	void (*expose)(void *);
+	void (*configure)(void *);
+	void (*property)(void *);
+	void (*client)(void *);
+	void (*focus_in)(void *);
+	void (*focus_out)(void *);
+	void (*enter)(void *);
+	void (*leave)(void *);
+	void (*map)(void *);
+	void (*unmap)(void *);
+	void (*destroy)(void *);
+};
 
 /**
  * PWindowSettings
@@ -37,8 +68,9 @@ struct PWindowSettings {
 	uint y;
 	uint width;
 	uint height;
-	PWindowDisplayType display_type;
-	PWindowInteractType interact_type;
+	enum PWindowDisplayType display_type;
+	enum PWindowInteractType interact_type;
+	PEventCalls *event_calls;
 	PDisplayInfo *display_info;
 };
 
@@ -54,9 +86,11 @@ struct PWindowRequest {
 	uint y;
 	uint width;
 	uint height;
-	PWindowDisplayType display_type;
-	PWindowInteractType interact_type;
+	enum PWindowDisplayType display_type;
+	enum PWindowInteractType interact_type;
+	PEventCalls event_calls;
 };
+
 
 /**
  * PAppInstance
@@ -145,7 +179,7 @@ struct PDeviceManager {
 #define p_event_deinit p_linux_event_deinit
 #define p_app_deinit p_linux_app_deinit
 
-PAppInstance *p_linux_app_init(PWindowRequest *window_request);
+PAppInstance *p_linux_app_init(void);
 PDeviceManager *p_linux_event_init(void);
 
 void p_linux_app_deinit(PAppInstance *app_instance);

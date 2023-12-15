@@ -1,5 +1,6 @@
 #include "phantom.h"
 #include <stdlib.h>
+#include <locale.h>
 
 /**
  * p_linux_app_init
@@ -7,14 +8,15 @@
  * Creates an application with GUI and input.
  * Takes a PWindowRequest for window creation and returns a PAppInstance.
  */
-PAppInstance *p_linux_app_init(PWindowRequest *window_request)
+PAppInstance *p_linux_app_init(void)
 {
+	// Set locale to same as system
+	setlocale(LC_ALL, "");
+
 	PAppInstance *app_instance = malloc(sizeof *app_instance);
 
-	// create a window
+	// create the window array
 	app_instance->window_settings = e_dynarr_init(sizeof (PWindowSettings), 1);
-
-	p_window_create(app_instance, *window_request);
 
 	// create the input manager
 	app_instance->input_manager = p_event_init();
