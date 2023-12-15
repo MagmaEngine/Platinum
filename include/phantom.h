@@ -19,13 +19,19 @@ typedef enum {
 	P_INTERACT_INPUT_OUTPUT,
 } PWindowInteractType;
 
+typedef struct PAppInstance PAppInstance;
+typedef struct PDeviceManager PDeviceManager;
+typedef struct PDisplayInfo PDisplayInfo;
+typedef struct PWindowRequest PWindowRequest;
+typedef struct PWindowSettings PWindowSettings;
+
 /**
  * PWindowSettings
  *
  * This struct acts as a status showing the window's current settings
  * Values here should never be set directly
  */
-typedef struct {
+struct PWindowSettings {
 	wchar_t *name;
 	uint x;
 	uint y;
@@ -33,7 +39,8 @@ typedef struct {
 	uint height;
 	PWindowDisplayType display_type;
 	PWindowInteractType interact_type;
-} PWindowSettings;
+	PDisplayInfo *display_info;
+};
 
 /**
  * PWindowRequest
@@ -41,7 +48,7 @@ typedef struct {
  * This struct is used to create a new window with the requested settings
  * Values here should never be set directly
  */
-typedef struct {
+struct PWindowRequest {
 	wchar_t *name;
 	uint x;
 	uint y;
@@ -49,7 +56,18 @@ typedef struct {
 	uint height;
 	PWindowDisplayType display_type;
 	PWindowInteractType interact_type;
-} PWindowRequest;
+};
+
+/**
+ * PAppInstance
+ *
+ * This struct is the holds all the information for the app for a GUI to work properly
+ */
+struct PAppInstance {
+	EDynarr *window_settings; // PWindowSettings
+	PDeviceManager *input_manager;
+};
+
 
 
 // X11 systems
@@ -63,11 +81,11 @@ typedef struct {
  * This struct holds all the low-level display information
  * Values here should never be set directly
  */
-typedef struct {
+struct PDisplayInfo {
 	xcb_connection_t *connection;
 	xcb_screen_t *screen;
 	xcb_window_t window;
-} PDisplayInfo;
+};
 
 #define p_window_create p_x11_window_create
 #define p_window_close p_x11_window_close
@@ -75,13 +93,13 @@ typedef struct {
 #define p_window_windowed_fullscreen p_x11_window_windowed_fullscreen
 #define p_window_windowed p_x11_window_windowed
 
-void p_x11_window_create(const PWindowRequest window_request, PDisplayInfo *display_info,
-		PWindowSettings *window_settings);
-void p_x11_window_close(PDisplayInfo *display_info, PWindowSettings *window_settings);
+void p_x11_window_create(PAppInstance *app_instance, const PWindowRequest window_request);
+void p_x11_window_close(PAppInstance *app_instance, PWindowSettings *window_settings);
 void p_x11_window_fullscreen(PDisplayInfo *display_info);
 void p_x11_window_windowed_fullscreen(PDisplayInfo *display_info);
 void p_x11_window_windowed(PDisplayInfo *display_info, uint x, uint y, uint width, uint height);
 void p_x11_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height);
+void *p_x11_window_event_manage(void *args);
 
 #endif
 
@@ -115,23 +133,11 @@ void p_wayland_window_windowed(PDisplayInfo *display_info, PWindowSettings *wind
  * This struct holds all the device handles and event monitors
  * TODO: use me
  */
-typedef struct {
+struct PDeviceManager {
 	EDynarr *udev_monitors;
 	EDynarr *libevs;
 	EDynarr *libev_uinputs;
-} PDeviceManager;
-
-/**
- * PAppInstance
- *
- * This struct is the holds all the information for the app for a GUI to work properly
- * TODO: use me
- */
-typedef struct {
-	PWindowSettings *window_settings;
-	PDisplayInfo *display_info;
-	PDeviceManager *input_manager;
-} PAppInstance;
+};
 
 #define p_event_init p_linux_event_init
 #define p_app_init p_linux_app_init

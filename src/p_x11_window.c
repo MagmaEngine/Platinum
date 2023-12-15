@@ -1,4 +1,6 @@
 #include "phantom.h"
+#include "enigma.h"
+#include <pthread.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -25,10 +27,9 @@ void p_x11_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uin
  * p_x11_window_create
  *
  * creates a window with parameters set from window_request.
- * returns a window_settings and display_info associated with the window.
+ * returns a window_settings associated with the window.
  */
-void p_x11_window_create(const PWindowRequest window_request, PDisplayInfo *display_info,
-		PWindowSettings *window_settings)
+void p_x11_window_create(PAppInstance *app_instance, const PWindowRequest window_request)
 {
 	// Create an XCB connection and window
 	xcb_connection_t *connection = xcb_connect(NULL, NULL);
@@ -43,6 +44,7 @@ void p_x11_window_create(const PWindowRequest window_request, PDisplayInfo *disp
 	xcb_screen_t *screen = xcb_setup_roots_iterator(xcb_get_setup(connection)).data;
 	xcb_window_t window = xcb_generate_id(connection);
 
+	PDisplayInfo *display_info = malloc(sizeof *display_info);
 	display_info->connection = connection;
 	display_info->screen = screen;
 	display_info->window = window;
@@ -50,6 +52,7 @@ void p_x11_window_create(const PWindowRequest window_request, PDisplayInfo *disp
 	uint class = P_INTERACT_INPUT_OUTPUT;
 	uint border_width = 0;
 
+	PWindowSettings *window_settings = malloc(sizeof *window_settings);
 	window_settings->name = malloc((wcslen(window_request.name)+1) * sizeof(wchar_t));
 	wcscpy(window_settings->name, window_request.name);
 	window_settings->x = window_request.x;
@@ -58,6 +61,7 @@ void p_x11_window_create(const PWindowRequest window_request, PDisplayInfo *disp
 	window_settings->height = window_request.height;
 	window_settings->display_type = window_request.display_type;
 	window_settings->interact_type = window_request.interact_type;
+	window_settings->display_info = display_info;
 
 	// creates the window
 	xcb_create_window(
@@ -71,16 +75,30 @@ void p_x11_window_create(const PWindowRequest window_request, PDisplayInfo *disp
 			screen->root_visual,
 			XCB_CW_BACK_PIXEL, &screen->black_pixel);
 
+	// Listen different events in the window
+	// PROPERTY_CHANGE:		When window properties change (windowed, fullscreen, windowed fullscreen)
+	// RESIZE_REDIRECT:		Requested resizing of window from WM
+	// EXPOSURE:			When a previously obscured part of window becomes visible
+	// STRUCTURE_NOTIFY:	When the window is resized, mapped, or moved
+	// SUBSTRUCTURE_NOTIFY:	Like STRUCTURE, but for subwindows
+	// FOCUS_CHANGE:		When the window gains or loses input focus
+	uint32_t event_mask =
+		XCB_EVENT_MASK_PROPERTY_CHANGE |
+		//XCB_EVENT_MASK_RESIZE_REDIRECT |
+		XCB_EVENT_MASK_LEAVE_WINDOW |
+		XCB_EVENT_MASK_ENTER_WINDOW |
+		XCB_EVENT_MASK_EXPOSURE |
+		XCB_EVENT_MASK_STRUCTURE_NOTIFY |
+		XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY |
+		XCB_EVENT_MASK_FOCUS_CHANGE;
+	xcb_change_window_attributes(connection, window, XCB_CW_EVENT_MASK, &event_mask);
+
 	// Set display based on type
 	switch (window_request.display_type)
 	{
 		case P_DISPLAY_WINDOWED:
 			p_x11_window_windowed(display_info, window_request.x, window_request.y, window_request.width,
 					window_request.height);
-				// display_info->screen->width_in_pixels/8,
-				// display_info->screen->height_in_pixels/8,
-				// display_info->screen->width_in_pixels * 0.75,
-				// display_info->screen->height_in_pixels * 0.75);
 		break;
 
 		case P_DISPLAY_WINDOWED_FULLSCREEN:
@@ -92,20 +110,155 @@ void p_x11_window_create(const PWindowRequest window_request, PDisplayInfo *disp
 		break;
 	}
 
-	return;
+	e_dynarr_add(app_instance->window_settings, window_settings);
+
+	// TODO: make wrapper for pthreads
+	// Start the window event manager
+	pthread_t thread_xcb_event_manager;
+	pthread_create(&thread_xcb_event_manager, NULL, p_x11_window_event_manage, (void *)window_settings);
+	pthread_join(thread_xcb_event_manager, NULL);
 }
+
 
 /**
  * p_x11_window_close
  *
  * closes the window and the connection to the Xserver
  */
-void p_x11_window_close(PDisplayInfo *display_info, PWindowSettings *window_settings)
+void p_x11_window_close(PAppInstance *app_instance, PWindowSettings *window_settings)
 {
-	xcb_unmap_window(display_info->connection, display_info->window);
-	xcb_disconnect(display_info->connection);
-	free(window_settings->name);
+	// Find the matching window and close it
+	int index = -1;
+	for(uint i = 0; i < app_instance->window_settings->num_items; i++)
+	{
+		if (&((PWindowSettings *)app_instance->window_settings->arr)[i] == window_settings)
+		{
+			index = i;
+			break;
+		}
+	}
+	// If window matches delete it.
+	if (index > -1)
+	{
+		PDisplayInfo *display_info = window_settings->display_info;
+		xcb_unmap_window(display_info->connection, display_info->window);
+		xcb_disconnect(display_info->connection);
+		free(window_settings->display_info);
+		free(window_settings->name);
+		e_dynarr_remove_unordered(app_instance->window_settings, index);
+	}
 }
+
+
+/**
+ * p_x11_window_event_manage
+ *
+ * This function runs in its own thread and manages window manager events
+ * Right now args is useless
+ */
+void *p_x11_window_event_manage(void *args)
+{
+	// unpack args
+	PWindowSettings *window_settings = (PWindowSettings *)args;
+	PDisplayInfo *display_info = window_settings->display_info;
+
+	uint window_alive = 1;
+
+	while (window_alive) {
+		xcb_generic_event_t *event = xcb_wait_for_event(display_info->connection);
+
+		if (event)
+		{
+			switch (event->response_type & ~0x80) {
+				case XCB_EXPOSE:
+				{
+					xcb_expose_event_t *expose_event = (xcb_expose_event_t *)event;
+					// TODO: redraw (only new part?)
+					printf("EVENT: XCB_EXPOSE\n");
+					break;
+				}
+				case XCB_CONFIGURE_NOTIFY:
+				{
+					xcb_configure_notify_event_t *config_event = (xcb_configure_notify_event_t *)event;
+					// TODO: Update window_settings
+					printf("EVENT: XCB_CONFIGURE_NOTIFY\n");
+					break;
+				}
+				case XCB_PROPERTY_NOTIFY:
+				{
+					xcb_property_notify_event_t *property_event = (xcb_property_notify_event_t *)event;
+					// TODO: Update window_settings
+					printf("EVENT: XCB_PROPERTY_NOTIFY\n");
+					break;
+				}
+				case XCB_CLIENT_MESSAGE:
+				{
+					xcb_client_message_event_t *message_event = (xcb_client_message_event_t *)event;
+					// TODO:
+					printf("EVENT: XCB_CLIENT_MESSAGE\n");
+					break;
+				}
+				case XCB_FOCUS_IN:
+				{
+					xcb_focus_in_event_t *focus_in_event = (xcb_focus_in_event_t *)event;
+					printf("EVENT: XCB_FOCUS_IN\n");
+					// TODO:
+					break;
+				}
+				case XCB_FOCUS_OUT:
+				{
+					xcb_focus_out_event_t *focus_out_event = (xcb_focus_out_event_t *)event;
+					printf("EVENT: XCB_FOCUS_OUT\n");
+					// TODO:
+					break;
+				}
+				case XCB_ENTER_NOTIFY:
+				{
+					xcb_enter_notify_event_t *enter_notify_event = (xcb_enter_notify_event_t *)event;
+					// TODO:
+					printf("EVENT: XCB_ENTER_NOTIFY\n");
+					break;
+				}
+				case XCB_LEAVE_NOTIFY:
+				{
+					xcb_leave_notify_event_t *leave_notify_event = (xcb_leave_notify_event_t *)event;
+					// TODO:
+					printf("EVENT: XCB_LEAVE_NOTIFY\n");
+					break;
+				}
+				case XCB_MAP_NOTIFY:
+				{
+					xcb_map_notify_event_t *map_notify_event = (xcb_map_notify_event_t *)event;
+					// TODO: mimimize/maximize? tell engine to go active?
+					printf("EVENT: XCB_MAP_NOTIFY\n");
+					break;
+				}
+				case XCB_UNMAP_NOTIFY:
+				{
+					xcb_unmap_notify_event_t *unmap_notify_event = (xcb_unmap_notify_event_t *)event;
+					// TODO: mimimize/maximize? tell engine to go dormant?
+					printf("EVENT: XCB_UNMAP_NOTIFY\n");
+					break;
+				}
+				case XCB_DESTROY_NOTIFY:
+				{
+					xcb_destroy_notify_event_t *destroy_event = (xcb_destroy_notify_event_t *)event;
+					window_alive = 0;
+					// TODO: handle errors
+					printf("EVENT: XCB_DESTROY_NOTIFY\n");
+					break;
+				}
+				// ... other cases for different event types ...
+			}
+		} else {
+			window_alive = 0;
+		}
+		free(event);
+	}
+	free(window_settings);
+	return NULL;
+}
+
 
 /**
  * p_x11_window_fullscreen
