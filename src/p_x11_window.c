@@ -32,11 +32,12 @@ xcb_atom_t p_x11_generate_atom(xcb_connection_t *connection, const char *atom_na
 {
 	xcb_intern_atom_cookie_t cookie = xcb_intern_atom(connection, 0, strlen(atom_name), atom_name);
 	xcb_intern_atom_reply_t *reply = xcb_intern_atom_reply(connection, cookie, NULL);
-	xcb_atom_t atom = XCB_ATOM_NONE;
-	if (reply) {
-		atom = reply->atom;
-		free(reply);
+	if (!reply) {
+		fprintf(stderr, "Could not get atom reply...");
+		exit(1);
 	}
+	xcb_atom_t atom = reply->atom;
+	free(reply);
 	return atom;
 }
 

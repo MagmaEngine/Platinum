@@ -1,10 +1,9 @@
-phantom_srcs = files()
+phantom_srcs = files('src/p_linux_events.c')
 
 phantom_deps = [
   dep_libenigma,
   dep_vulkan,
   ]
-
 
 message(host_machine.system())
 
