@@ -98,7 +98,7 @@ struct PWindowRequest {
  * This struct is the holds all the information for the app for a GUI to work properly
  */
 struct PAppInstance {
-	EDynarr *window_settings; // PWindowSettings
+	EDynarr *window_settings; // Array of (PWindowSettings *)
 	PDeviceManager *input_manager;
 };
 

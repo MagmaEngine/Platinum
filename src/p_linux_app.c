@@ -16,7 +16,7 @@ PAppInstance *p_linux_app_init(void)
 	PAppInstance *app_instance = malloc(sizeof *app_instance);
 
 	// create the window array
-	app_instance->window_settings = e_dynarr_init(sizeof (PWindowSettings), 1);
+	app_instance->window_settings = e_dynarr_init(sizeof (PWindowSettings *), 1);
 
 	// create the input manager
 	app_instance->input_manager = p_event_init();
@@ -34,7 +34,7 @@ void p_linux_app_deinit(PAppInstance *app_instance)
 	// close all windows
 	while(app_instance->window_settings->num_items > 0)
 	{
-		p_window_close(app_instance, (PWindowSettings *)app_instance->window_settings->arr);
+		p_window_close(app_instance, *(PWindowSettings **)app_instance->window_settings->arr);
 	}
 	e_dynarr_deinit(app_instance->window_settings);
 	p_event_deinit(app_instance->input_manager);

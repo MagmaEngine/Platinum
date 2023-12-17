@@ -7,6 +7,20 @@
 #include <wchar.h>
 #include <xcb/xcb.h>
 
+// Fullscreen is
+// 		Normal
+// 		Fullscreen
+//
+// Windowed Fullscreen is
+// 		no decorations
+// 		normal
+// 		not fullscreen
+//
+// Windowed is
+// 		any resolution
+// 		decorations
+// 		not fullscreen
+
 /**
  * p_x11_window_set_dimensions
  *
@@ -74,10 +88,10 @@ void p_x11_window_create(PAppInstance *app_instance, const PWindowRequest window
 	PWindowSettings *window_settings = malloc(sizeof *window_settings);
 	window_settings->name = malloc((wcslen(window_request.name)+1) * sizeof(wchar_t));
 	wcscpy(window_settings->name, window_request.name);
-	window_settings->x = window_request.x;
-	window_settings->y = window_request.y;
-	window_settings->width = window_request.width;
-	window_settings->height = window_request.height;
+	window_settings->x = e_mini(e_maxi(window_request.x, 0), screen->width_in_pixels);
+	window_settings->y = e_mini(e_maxi(window_request.y, 0), screen->height_in_pixels);
+	window_settings->width = e_mini(e_maxi(window_request.width, 1), screen->width_in_pixels);
+	window_settings->height = e_mini(e_maxi(window_request.height, 1), screen->width_in_pixels);
 	window_settings->display_type = window_request.display_type;
 	window_settings->interact_type = window_request.interact_type;
 	window_settings->display_info = display_info;
@@ -90,7 +104,7 @@ void p_x11_window_create(PAppInstance *app_instance, const PWindowRequest window
 			XCB_COPY_FROM_PARENT,
 			window,
 			screen->root,
-			window_request.x, window_request.y, window_request.width, window_request.height,
+			window_settings->x, window_settings->y, window_settings->width, window_settings->height,
 			border_width,
 			class,
 			screen->root_visual,
@@ -131,14 +145,14 @@ void p_x11_window_create(PAppInstance *app_instance, const PWindowRequest window
 		break;
 	}
 
-	e_dynarr_add(app_instance->window_settings, window_settings);
+	e_dynarr_add(app_instance->window_settings, &window_settings);
 
 	// TODO: make wrapper for pthreads
 	// Start the window event manager
 	pthread_t thread_xcb_event_manager;
 	pthread_create(&thread_xcb_event_manager, NULL, p_x11_window_event_manage, (void *)window_settings);
-	//pthread_detach(thread_xcb_event_manager);
-	pthread_join(thread_xcb_event_manager, NULL);
+	pthread_detach(thread_xcb_event_manager);
+	//pthread_join(thread_xcb_event_manager, NULL);
 }
 
 
@@ -153,7 +167,7 @@ void p_x11_window_close(PAppInstance *app_instance, PWindowSettings *window_sett
 	int index = -1;
 	for(uint i = 0; i < app_instance->window_settings->num_items; i++)
 	{
-		if (&((PWindowSettings *)app_instance->window_settings->arr)[i] == window_settings)
+		if (((PWindowSettings **)app_instance->window_settings->arr)[i] == window_settings)
 		{
 			index = i;
 			break;
@@ -169,6 +183,9 @@ void p_x11_window_close(PAppInstance *app_instance, PWindowSettings *window_sett
 		free(window_settings->event_calls);
 		free(window_settings->name);
 		e_dynarr_remove_unordered(app_instance->window_settings, index);
+	} else {
+		fprintf(stderr, "Could not close window...\n");
+		exit(1);
 	}
 }
 
@@ -217,36 +234,57 @@ void *p_x11_window_event_manage(void *args)
 
 					xcb_atom_t atom_state = p_x11_generate_atom(display_info->connection, "_NET_WM_STATE");
 					xcb_atom_t atom_fullscreen = p_x11_generate_atom(display_info->connection, "_NET_WM_STATE_FULLSCREEN");
+					xcb_atom_t atom_decor = p_x11_generate_atom(display_info->connection, "_NET_WM_DECORATION");
+					xcb_atom_t atom_decor_all = p_x11_generate_atom(display_info->connection, "_NET_WM_DECORATION_ALL");
+					xcb_atom_t atom_type = p_x11_generate_atom(display_info->connection, "_NET_WM_WINDOW_TYPE");
+					xcb_atom_t atom_type_normal = p_x11_generate_atom(display_info->connection, "_NET_WM_WINDOW_TYPE_NORMAL");
 
-					//enum PWindowDisplayType display_type;
-					if (property_notify_event->atom == atom_state)
+					xcb_get_property_cookie_t property_cookie_state = xcb_get_property(display_info->connection, 0,
+							display_info->window, atom_state, XCB_ATOM_ANY, 0, 1024);
+					xcb_get_property_reply_t *property_reply_state = xcb_get_property_reply(display_info->connection,
+							property_cookie_state, NULL);
+
+					xcb_get_property_cookie_t property_cookie_decor = xcb_get_property(display_info->connection, 0,
+							display_info->window, atom_decor, XCB_ATOM_ANY, 0, 1024);
+					xcb_get_property_reply_t *property_reply_decor = xcb_get_property_reply(display_info->connection,
+							property_cookie_decor, NULL);
+
+					xcb_get_property_cookie_t property_cookie_type = xcb_get_property(display_info->connection, 0,
+							display_info->window, atom_type, XCB_ATOM_ANY, 0, 1024);
+					xcb_get_property_reply_t *property_reply_type = xcb_get_property_reply(display_info->connection,
+							property_cookie_type, NULL);
+
+					if (property_reply_state && property_reply_decor && property_reply_type)
 					{
-						// Handle _NET_WM_STATE property change
-						printf("_NET_WM_STATE property changed\n");
-					}
-					xcb_get_property_cookie_t cookie =
-						xcb_get_property(display_info->connection, 0, display_info->window, atom_state, XCB_ATOM_ANY, 0,
-								1024);
-					xcb_get_property_reply_t *reply =
-						xcb_get_property_reply(display_info->connection, cookie, NULL);
+						xcb_atom_t *state_state = (xcb_atom_t *)xcb_get_property_value(property_reply_state);
+						xcb_atom_t *state_decor = (xcb_atom_t *)xcb_get_property_value(property_reply_decor);
+						xcb_atom_t *state_type = (xcb_atom_t *)xcb_get_property_value(property_reply_type);
+						int num_state_atoms = xcb_get_property_value_length(property_reply_state) / sizeof(xcb_atom_t);
+						int num_decor_atoms = xcb_get_property_value_length(property_reply_decor) / sizeof(xcb_atom_t);
+						int num_type_atoms = xcb_get_property_value_length(property_reply_type) / sizeof(xcb_atom_t);
 
-					if (reply)
-					{
-						xcb_atom_t *state = (xcb_atom_t *)xcb_get_property_value(reply);
-						int num_atoms = xcb_get_property_value_length(reply) / sizeof(xcb_atom_t);
-						// Check if the _NET_WM_STATE_FULLSCREEN atom is present
-						for (int i = 0; i < num_atoms; i++) {
-							if (state[i] == atom_fullscreen) {
-								// Fullscreen is set
-								//display_type = P_DISPLAY_FULLSCREEN;
-								break;
-							}
-						}
-						free(reply);
-					}
+						// Check what atoms are present
+						bool is_fullscreen = false;
+						bool is_decorated = true;
+						bool is_normal = false;
+						for (int i = 0; i < num_state_atoms; i++)
+							is_fullscreen |= (state_state[i] == atom_fullscreen);
+						for (int i = 0; i < num_decor_atoms; i++)
+							is_decorated |= (state_decor[i] == atom_decor_all);
+						for (int i = 0; i < num_type_atoms; i++)
+							is_normal |= (state_type[i] == atom_type_normal);
 
-					// Set Fullscreen status
-					//window_settings->display_type = display_type;
+						free(property_reply_state);
+						free(property_reply_decor);
+						free(property_reply_type);
+
+						if (is_fullscreen)
+							window_settings->display_type = P_DISPLAY_FULLSCREEN;
+						else if (is_decorated && is_normal)
+							window_settings->display_type = P_DISPLAY_WINDOWED;
+						else if (!is_decorated && is_normal)
+							window_settings->display_type = P_DISPLAY_WINDOWED_FULLSCREEN;
+					}
 
 					if (event_calls->enable_property && event_calls->property != NULL)
 						event_calls->property(property_notify_event);
