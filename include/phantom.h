@@ -11,12 +11,14 @@ typedef unsigned int uint;
 enum PWindowDisplayType {
 	P_DISPLAY_WINDOWED,
 	P_DISPLAY_FULLSCREEN,
-	P_DISPLAY_WINDOWED_FULLSCREEN,
+	P_DISPLAY_DOCKED_FULLSCREEN,
+	P_DISPLAY_MAX
 };
 
 enum PWindowInteractType {
 	P_INTERACT_INPUT,
 	P_INTERACT_INPUT_OUTPUT,
+	P_INTERACT_MAX
 };
 
 typedef struct PAppInstance PAppInstance;
@@ -110,6 +112,24 @@ struct PAppInstance {
 #include <xcb/xcb.h>
 
 /**
+ * PAtomTypes
+ *
+ * This enum is used to initialize the display_info atoms
+ * for quick lookup later
+ */
+enum PAtomTypes {
+	P_ATOM_NET_WM_STATE,
+	P_ATOM_NET_WM_STATE_FULLSCREEN,
+	P_ATOM_NET_WM_DECORATION,
+	P_ATOM_NET_WM_DECORATION_ALL,
+	P_ATOM_NET_WM_WINDOW_TYPE,
+	P_ATOM_NET_WM_WINDOW_TYPE_NORMAL,
+	P_ATOM_NET_WM_WINDOW_TYPE_DOCK,
+	P_ATOM_MOTIF_WM_HINTS,
+	P_ATOM_MAX
+};
+
+/**
  * PDisplayInfo
  *
  * This struct holds all the low-level display information
@@ -119,6 +139,7 @@ struct PDisplayInfo {
 	xcb_connection_t *connection;
 	xcb_screen_t *screen;
 	xcb_window_t window;
+	xcb_atom_t atoms[P_ATOM_MAX];
 };
 
 #define p_window_create p_x11_window_create
