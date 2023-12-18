@@ -11,6 +11,8 @@ message(host_machine.system())
 # Check OS
 if target_os == 'windows'
 elif target_os == 'linux'
+  dep_evdev = dependency('libevdev', required : true)
+  dep_udev = dependency('libudev', required : true)
   phantom_srcs += [
     files('src/p_linux_events.c'),
     files('src/p_linux_app.c'),
