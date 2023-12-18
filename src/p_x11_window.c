@@ -108,6 +108,7 @@ void p_x11_window_create(PAppInstance *app_instance, const PWindowRequest window
 	window_settings->display_info = display_info;
 	window_settings->event_calls = calloc(1, sizeof *window_settings->event_calls);
 	memcpy(window_settings->event_calls, &window_request.event_calls, sizeof *window_settings->event_calls);
+	window_settings->deinit = false;
 
 	// creates the window
 	xcb_create_window(
@@ -211,10 +212,13 @@ void _x11_window_close(PAppInstance *app_instance, PWindowSettings *window_setti
 	xcb_unmap_window(display_info->connection, display_info->window);
 	xcb_disconnect(display_info->connection);
 	free(window_settings->display_info);
-	free(window_settings->event_calls);
-	free(window_settings->event_manager);
-	free(window_settings->name);
-	free(window_settings);
+	if (!window_settings->deinit)
+	{
+		free(window_settings->event_calls);
+		free(window_settings->event_manager);
+		free(window_settings->name);
+		free(window_settings);
+	}
 	e_dynarr_remove_unordered(app_instance->window_settings, index);
 	mtx_unlock(app_instance->window_mutex);
 }

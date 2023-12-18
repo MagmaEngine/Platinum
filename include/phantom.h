@@ -76,6 +76,7 @@ struct PWindowSettings {
 	thrd_t *event_manager;
 	PEventCalls *event_calls;
 	PDisplayInfo *display_info;
+	bool deinit;
 };
 
 /**

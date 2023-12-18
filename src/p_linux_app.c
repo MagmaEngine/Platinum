@@ -41,23 +41,22 @@ PAppInstance *p_linux_app_init(void)
  */
 void p_linux_app_deinit(PAppInstance *app_instance)
 {
-	// close all windows
-	//uint num_windows = app_instance->window_settings->num_items;
-	//PWindowSettings **window_settings = malloc(sizeof (PWindowSettings *) * num_windows);
-	//for (uint i = 0; i < app_instance->window_settings->num_items; i++)
-	//	window_settings[i] = ((PWindowSettings **)app_instance->window_settings->arr)[i];
-
-	//for (uint i = 0; i < num_windows; i++)
 	while (app_instance->window_settings->num_items > 0)
 	{
 		int result;
 		PWindowSettings *window_settings = *((PWindowSettings **)app_instance->window_settings->arr);
+		window_settings->deinit = true;
 		p_window_close(app_instance, window_settings);
 		if (thrd_join(*window_settings->event_manager, &result) != thrd_success)
 		{
 			fprintf(stderr, "Error joining window event manager...\n");
 			exit(1);
 		}
+		free(window_settings->event_calls);
+		free(window_settings->event_manager);
+		free(window_settings->name);
+		free(window_settings);
+		e_dynarr_remove_unordered_ptr(app_instance->window_settings, window_settings);
 	}
 	e_dynarr_deinit(app_instance->window_settings);
 	//free(window_settings);
