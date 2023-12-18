@@ -1,6 +1,6 @@
 #include "phantom.h"
 #include "enigma.h"
-#include <pthread.h>
+#include <threads.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -67,14 +67,23 @@ void p_x11_window_create(PAppInstance *app_instance, const PWindowRequest window
 	display_info->screen = screen;
 	display_info->window = window;
 	display_info->atoms[P_ATOM_NET_WM_STATE] = p_x11_generate_atom(display_info->connection, "_NET_WM_STATE");
-	display_info->atoms[P_ATOM_NET_WM_STATE_FULLSCREEN] = p_x11_generate_atom(display_info->connection, "_NET_WM_STATE_FULLSCREEN");
-	display_info->atoms[P_ATOM_NET_WM_DECORATION] = p_x11_generate_atom(display_info->connection, "_NET_WM_DECORATION");
-	display_info->atoms[P_ATOM_NET_WM_DECORATION_ALL] = p_x11_generate_atom(display_info->connection, "_NET_WM_DECORATION_ALL");
-	display_info->atoms[P_ATOM_NET_WM_WINDOW_TYPE] = p_x11_generate_atom(display_info->connection, "_NET_WM_WINDOW_TYPE");
-	display_info->atoms[P_ATOM_NET_WM_WINDOW_TYPE_NORMAL] = p_x11_generate_atom(display_info->connection, "_NET_WM_WINDOW_TYPE_NORMAL");
-	display_info->atoms[P_ATOM_NET_WM_WINDOW_TYPE_DIALOG] = p_x11_generate_atom(display_info->connection, "_NET_WM_WINDOW_TYPE_DIALOG");
-	display_info->atoms[P_ATOM_NET_WM_WINDOW_TYPE_DOCK] = p_x11_generate_atom(display_info->connection, "_NET_WM_WINDOW_TYPE_DOCK");
-	display_info->atoms[P_ATOM_MOTIF_WM_HINTS] = p_x11_generate_atom(display_info->connection, "_MOTIF_WM_HINTS");
+	display_info->atoms[P_ATOM_NET_WM_STATE_FULLSCREEN] = p_x11_generate_atom(display_info->connection,
+			"_NET_WM_STATE_FULLSCREEN");
+	display_info->atoms[P_ATOM_NET_WM_DECORATION] = p_x11_generate_atom(display_info->connection,
+			"_NET_WM_DECORATION");
+	display_info->atoms[P_ATOM_NET_WM_DECORATION_ALL] = p_x11_generate_atom(display_info->connection,
+			"_NET_WM_DECORATION_ALL");
+	display_info->atoms[P_ATOM_NET_WM_WINDOW_TYPE] = p_x11_generate_atom(display_info->connection,
+			"_NET_WM_WINDOW_TYPE");
+	display_info->atoms[P_ATOM_NET_WM_WINDOW_TYPE_NORMAL] = p_x11_generate_atom(display_info->connection,
+			"_NET_WM_WINDOW_TYPE_NORMAL");
+	display_info->atoms[P_ATOM_NET_WM_WINDOW_TYPE_DIALOG] = p_x11_generate_atom(display_info->connection,
+			"_NET_WM_WINDOW_TYPE_DIALOG");
+	display_info->atoms[P_ATOM_NET_WM_WINDOW_TYPE_DOCK] = p_x11_generate_atom(display_info->connection,
+			"_NET_WM_WINDOW_TYPE_DOCK");
+	display_info->atoms[P_ATOM_MOTIF_WM_HINTS] = p_x11_generate_atom(display_info->connection,
+			"_MOTIF_WM_HINTS");
+
 	for (uint i = 0; i < P_ATOM_MAX; i++)
 	{
 		if (display_info->atoms[i] == XCB_ATOM_NONE)
@@ -83,7 +92,6 @@ void p_x11_window_create(PAppInstance *app_instance, const PWindowRequest window
 			exit(1);
 		}
 	}
-
 
 	uint class = P_INTERACT_INPUT_OUTPUT;
 	uint border_width = 0;
@@ -152,48 +160,63 @@ void p_x11_window_create(PAppInstance *app_instance, const PWindowRequest window
 			exit(1);
 	}
 
+	mtx_lock(app_instance->window_mutex);
 	e_dynarr_add(app_instance->window_settings, &window_settings);
+	mtx_unlock(app_instance->window_mutex);
 
 	// TODO: make wrapper for pthreads
 	// Start the window event manager
-	pthread_t thread_xcb_event_manager;
-	pthread_create(&thread_xcb_event_manager, NULL, p_window_event_manage, (void *)window_settings);
-	pthread_detach(thread_xcb_event_manager);
-	//pthread_join(thread_xcb_event_manager, NULL);
+	thrd_t *thread_xcb_event_manager = malloc(sizeof *thread_xcb_event_manager);
+	window_settings->event_manager = thread_xcb_event_manager;
+
+	void *args = malloc(sizeof (PAppInstance *) + sizeof (PWindowSettings *));
+	memcpy(args, &app_instance, sizeof (PAppInstance **));
+	memcpy(&((char *)args)[sizeof (PAppInstance **)], &window_settings, sizeof (PWindowSettings **));
+
+	if(thrd_create(thread_xcb_event_manager, p_window_event_manage, args) != thrd_success)
+	{
+		fprintf(stderr, "Error creating window event manager...\n");
+		exit(1);
+	}
 }
 
 /**
  * p_x11_window_close
  *
- * closes the window and the connection to the Xserver
+ * sends a signal to close the window and the connection to the Xserver
  */
 void p_x11_window_close(PAppInstance *app_instance, PWindowSettings *window_settings)
 {
-	// Find the matching window and close it
-	int index = -1;
-	for(uint i = 0; i < app_instance->window_settings->num_items; i++)
+	xcb_destroy_window(window_settings->display_info->connection, window_settings->display_info->window);
+	xcb_flush(window_settings->display_info->connection);
+}
+
+
+/**
+ * _x11_window_close
+ *
+ * internal close function that actually closes the window and frees data
+ */
+void _x11_window_close(PAppInstance *app_instance, PWindowSettings *window_settings)
+{
+	// If window exists delete it.
+	mtx_lock(app_instance->window_mutex);
+	int index = e_dynarr_contains(app_instance->window_settings, &window_settings);
+	if (index == -1)
 	{
-		if (((PWindowSettings **)app_instance->window_settings->arr)[i] == window_settings)
-		{
-			index = i;
-			break;
-		}
-	}
-	// If window matches delete it.
-	if (index > -1)
-	{
-		PDisplayInfo *display_info = window_settings->display_info;
-		xcb_unmap_window(display_info->connection, display_info->window);
-		xcb_disconnect(display_info->connection);
-		free(window_settings->display_info);
-		free(window_settings->event_calls);
-		free(window_settings->name);
-		free(window_settings);
-		e_dynarr_remove_unordered(app_instance->window_settings, index);
-	} else {
-		fprintf(stderr, "Could not close window...\n");
+		fprintf(stderr, "Window does not exist...\n");
 		exit(1);
 	}
+	PDisplayInfo *display_info = window_settings->display_info;
+	xcb_unmap_window(display_info->connection, display_info->window);
+	xcb_disconnect(display_info->connection);
+	free(window_settings->display_info);
+	free(window_settings->event_calls);
+	free(window_settings->event_manager);
+	free(window_settings->name);
+	free(window_settings);
+	e_dynarr_remove_unordered(app_instance->window_settings, index);
+	mtx_unlock(app_instance->window_mutex);
 }
 
 /**
@@ -202,159 +225,165 @@ void p_x11_window_close(PAppInstance *app_instance, PWindowSettings *window_sett
  * This function runs in its own thread and manages window manager events
  * Right now args is useless
  */
-void *p_x11_window_event_manage(void *args)
+int p_x11_window_event_manage(void *args)
 {
 	// unpack args
-	PWindowSettings *window_settings = (PWindowSettings *)args;
+	PAppInstance *app_instance = ((PAppInstance **)args)[0];
+	PWindowSettings *window_settings = *(PWindowSettings **)&((char *)args)[sizeof (PAppInstance **)];
+	//PWindowSettings *window_settings = ((PWindowSettings **)args)[1];
 	PDisplayInfo *display_info = window_settings->display_info;
 	PEventCalls *event_calls = window_settings->event_calls;
 
-	bool window_alive = true;
 
+	bool window_alive = true;
 	while (window_alive) {
 		xcb_generic_event_t *event = xcb_wait_for_event(display_info->connection);
-
-		if (event)
+		if (!event)
 		{
-			switch (event->response_type & ~0x80) {
-				// TODO: experiment with capturing mouse and keyboard
-				case XCB_EXPOSE:
-				{
-					xcb_expose_event_t *expose_event = (xcb_expose_event_t *)event;
-					// TODO: redraw (only new part?)
-					if (event_calls->enable_expose && event_calls->expose != NULL)
-						event_calls->expose(expose_event);
-					break;
-				}
-				case XCB_CONFIGURE_NOTIFY:
-				{
-					xcb_configure_notify_event_t *config_notify_event = (xcb_configure_notify_event_t *)event;
-					// TODO: Update window_settings
-					if (event_calls->enable_configure && event_calls->configure != NULL)
-						event_calls->configure(config_notify_event);
-					break;
-				}
-				case XCB_PROPERTY_NOTIFY:
-				{
-					xcb_property_notify_event_t *property_notify_event = (xcb_property_notify_event_t *)event;
+			fprintf(stderr, "Event was null...\n");
+			_x11_window_close(app_instance, window_settings);
+			break;
+		}
+		switch (event->response_type & ~0x80)
+		{
+			// TODO: experiment with capturing mouse and keyboard
+			case XCB_EXPOSE:
+			{
+				xcb_expose_event_t *expose_event = (xcb_expose_event_t *)event;
+				// TODO: redraw (only new part?)
+				if (event_calls->enable_expose && event_calls->expose != NULL)
+					event_calls->expose(expose_event);
+				break;
+			}
+			case XCB_CONFIGURE_NOTIFY:
+			{
+				xcb_configure_notify_event_t *config_notify_event = (xcb_configure_notify_event_t *)event;
+				window_settings->x = config_notify_event->x;
+				window_settings->y = config_notify_event->y;
+				window_settings->width = config_notify_event->width;
+				window_settings->height = config_notify_event->height;
+				if (event_calls->enable_configure && event_calls->configure != NULL)
+					event_calls->configure(config_notify_event);
+				break;
+			}
+			case XCB_PROPERTY_NOTIFY:
+			{
+				xcb_property_notify_event_t *property_notify_event = (xcb_property_notify_event_t *)event;
 
-					xcb_get_property_cookie_t property_cookie_state = xcb_get_property(display_info->connection, 0,
-							display_info->window, display_info->atoms[P_ATOM_NET_WM_STATE], XCB_ATOM_ANY, 0, 1024);
-					xcb_get_property_reply_t *property_reply_state = xcb_get_property_reply(display_info->connection,
-							property_cookie_state, NULL);
+				xcb_get_property_cookie_t property_cookie_state = xcb_get_property(display_info->connection, 0,
+						display_info->window, display_info->atoms[P_ATOM_NET_WM_STATE], XCB_ATOM_ANY, 0, 1024);
+				xcb_get_property_reply_t *property_reply_state = xcb_get_property_reply(display_info->connection,
+						property_cookie_state, NULL);
 
-					xcb_get_property_cookie_t property_cookie_type = xcb_get_property(display_info->connection, 0,
-							display_info->window, display_info->atoms[P_ATOM_NET_WM_WINDOW_TYPE], XCB_ATOM_ANY, 0, 1024);
-					xcb_get_property_reply_t *property_reply_type = xcb_get_property_reply(display_info->connection,
-							property_cookie_type, NULL);
+				xcb_get_property_cookie_t property_cookie_type = xcb_get_property(display_info->connection, 0,
+						display_info->window, display_info->atoms[P_ATOM_NET_WM_WINDOW_TYPE], XCB_ATOM_ANY, 0,
+						1024);
+				xcb_get_property_reply_t *property_reply_type = xcb_get_property_reply(display_info->connection,
+						property_cookie_type, NULL);
 
-					if (property_reply_state && property_reply_type)
+				if (property_reply_state && property_reply_type)
+				{
+					xcb_atom_t *state_state = (xcb_atom_t *)xcb_get_property_value(property_reply_state);
+					xcb_atom_t *state_type = (xcb_atom_t *)xcb_get_property_value(property_reply_type);
+					int num_state_atoms = xcb_get_property_value_length(property_reply_state) / sizeof(xcb_atom_t);
+					int num_type_atoms = xcb_get_property_value_length(property_reply_type) / sizeof(xcb_atom_t);
+
+					// Check what atoms are present
+					bool is_fullscreen = false;
+					bool is_normal = false;
+					bool is_dock = false;
+					for (int i = 0; i < num_state_atoms; i++)
+						is_fullscreen |= (state_state[i] == display_info->atoms[P_ATOM_NET_WM_STATE_FULLSCREEN]);
+					for (int i = 0; i < num_type_atoms; i++)
 					{
-						xcb_atom_t *state_state = (xcb_atom_t *)xcb_get_property_value(property_reply_state);
-						xcb_atom_t *state_type = (xcb_atom_t *)xcb_get_property_value(property_reply_type);
-						int num_state_atoms = xcb_get_property_value_length(property_reply_state) / sizeof(xcb_atom_t);
-						int num_type_atoms = xcb_get_property_value_length(property_reply_type) / sizeof(xcb_atom_t);
-
-						// Check what atoms are present
-						bool is_fullscreen = false;
-						bool is_normal = false;
-						bool is_dock = false;
-						for (int i = 0; i < num_state_atoms; i++)
-							is_fullscreen |= (state_state[i] == display_info->atoms[P_ATOM_NET_WM_STATE_FULLSCREEN]);
-						for (int i = 0; i < num_type_atoms; i++)
-						{
-							is_dock |= (state_type[i] == display_info->atoms[P_ATOM_NET_WM_WINDOW_TYPE_DOCK]);
-							is_normal |= (state_type[i] == display_info->atoms[P_ATOM_NET_WM_WINDOW_TYPE_NORMAL]);
-						}
-
-						free(property_reply_state);
-						free(property_reply_type);
-
-						if (is_fullscreen)
-							window_settings->display_type = P_DISPLAY_FULLSCREEN;
-						else if (is_normal)
-							window_settings->display_type = P_DISPLAY_WINDOWED;
-						else if (is_dock)
-							window_settings->display_type = P_DISPLAY_DOCKED_FULLSCREEN;
+						is_dock |= (state_type[i] == display_info->atoms[P_ATOM_NET_WM_WINDOW_TYPE_DOCK]);
+						is_normal |= (state_type[i] == display_info->atoms[P_ATOM_NET_WM_WINDOW_TYPE_NORMAL]);
 					}
 
-					if (event_calls->enable_property && event_calls->property != NULL)
-						event_calls->property(property_notify_event);
-					break;
+					free(property_reply_state);
+					free(property_reply_type);
+
+					if (is_fullscreen)
+						window_settings->display_type = P_DISPLAY_FULLSCREEN;
+					else if (is_normal)
+						window_settings->display_type = P_DISPLAY_WINDOWED;
+					else if (is_dock)
+						window_settings->display_type = P_DISPLAY_DOCKED_FULLSCREEN;
 				}
-				case XCB_CLIENT_MESSAGE:
-				{
-					xcb_client_message_event_t *message_event = (xcb_client_message_event_t *)event;
-					// TODO:
-					if (event_calls->enable_client && event_calls->client != NULL)
-						event_calls->client(message_event);
-					break;
-				}
-				case XCB_FOCUS_IN:
-				{
-					xcb_focus_in_event_t *focus_in_event = (xcb_focus_in_event_t *)event;
-					// TODO:
-					if (event_calls->enable_focus_in && event_calls->focus_in != NULL)
-						event_calls->focus_in(focus_in_event);
-					break;
-				}
-				case XCB_FOCUS_OUT:
-				{
-					xcb_focus_out_event_t *focus_out_event = (xcb_focus_out_event_t *)event;
-					// TODO:
-					if (event_calls->enable_focus_out && event_calls->focus_out != NULL)
-						event_calls->focus_out(focus_out_event);
-					break;
-				}
-				case XCB_ENTER_NOTIFY:
-				{
-					xcb_enter_notify_event_t *enter_notify_event = (xcb_enter_notify_event_t *)event;
-					// TODO:
-					if (event_calls->enable_enter && event_calls->enter != NULL)
-						event_calls->enter(enter_notify_event);
-					break;
-				}
-				case XCB_LEAVE_NOTIFY:
-				{
-					xcb_leave_notify_event_t *leave_notify_event = (xcb_leave_notify_event_t *)event;
-					// TODO:
-					if (event_calls->enable_leave && event_calls->leave != NULL)
-						event_calls->leave(leave_notify_event);
-					break;
-				}
-				case XCB_MAP_NOTIFY:
-				{
-					xcb_map_notify_event_t *map_notify_event = (xcb_map_notify_event_t *)event;
-					// TODO: mimimize/maximize? tell engine to go active?
-					if (event_calls->enable_map && event_calls->map != NULL)
-						event_calls->map(map_notify_event);
-					break;
-				}
-				case XCB_UNMAP_NOTIFY:
-				{
-					xcb_unmap_notify_event_t *unmap_notify_event = (xcb_unmap_notify_event_t *)event;
-					// TODO: mimimize/maximize? tell engine to go dormant?
-					if (event_calls->enable_unmap && event_calls->unmap != NULL)
-						event_calls->unmap(unmap_notify_event);
-					break;
-				}
-				case XCB_DESTROY_NOTIFY:
-				{
-					xcb_destroy_notify_event_t *destroy_notify_event = (xcb_destroy_notify_event_t *)event;
-					printf("Window killed\n");
-					window_alive = false;
-					// TODO: handle errors
-					if (event_calls->enable_destroy && event_calls->destroy != NULL)
-						event_calls->destroy(destroy_notify_event);
-					break;
-				}
+
+				if (event_calls->enable_property && event_calls->property != NULL)
+					event_calls->property(property_notify_event);
+				break;
 			}
-		} else {
-			window_alive = false;
+			case XCB_CLIENT_MESSAGE:
+			{
+				xcb_client_message_event_t *message_event = (xcb_client_message_event_t *)event;
+				if (event_calls->enable_client && event_calls->client != NULL)
+					event_calls->client(message_event);
+				break;
+			}
+			case XCB_FOCUS_IN:
+			{
+				xcb_focus_in_event_t *focus_in_event = (xcb_focus_in_event_t *)event;
+				if (event_calls->enable_focus_in && event_calls->focus_in != NULL)
+					event_calls->focus_in(focus_in_event);
+				break;
+			}
+			case XCB_FOCUS_OUT:
+			{
+				xcb_focus_out_event_t *focus_out_event = (xcb_focus_out_event_t *)event;
+				if (event_calls->enable_focus_out && event_calls->focus_out != NULL)
+					event_calls->focus_out(focus_out_event);
+				break;
+			}
+			case XCB_ENTER_NOTIFY:
+			{
+				xcb_enter_notify_event_t *enter_notify_event = (xcb_enter_notify_event_t *)event;
+				if (event_calls->enable_enter && event_calls->enter != NULL)
+					event_calls->enter(enter_notify_event);
+				break;
+			}
+			case XCB_LEAVE_NOTIFY:
+			{
+				xcb_leave_notify_event_t *leave_notify_event = (xcb_leave_notify_event_t *)event;
+				if (event_calls->enable_leave && event_calls->leave != NULL)
+					event_calls->leave(leave_notify_event);
+				break;
+			}
+			case XCB_MAP_NOTIFY:
+			{
+				xcb_map_notify_event_t *map_notify_event = (xcb_map_notify_event_t *)event;
+				// TODO: mimimize/maximize? tell engine to go active?
+				if (event_calls->enable_map && event_calls->map != NULL)
+					event_calls->map(map_notify_event);
+				break;
+			}
+			case XCB_UNMAP_NOTIFY:
+			{
+				xcb_unmap_notify_event_t *unmap_notify_event = (xcb_unmap_notify_event_t *)event;
+				// TODO: mimimize/maximize? tell engine to go dormant?
+				if (event_calls->enable_unmap && event_calls->unmap != NULL)
+					event_calls->unmap(unmap_notify_event);
+				break;
+			}
+			case XCB_DESTROY_NOTIFY:
+			{
+				xcb_destroy_notify_event_t *destroy_notify_event = (xcb_destroy_notify_event_t *)event;
+				// TODO: handle errors
+
+				if (event_calls->enable_destroy && event_calls->destroy != NULL)
+					event_calls->destroy(destroy_notify_event);
+
+				window_alive = false;
+				_x11_window_close(app_instance, window_settings);
+
+				break;
+			}
 		}
 		free(event);
 	}
-	return NULL;
+	free(args);
+	return 0;
 }
 
 /**
@@ -451,12 +480,11 @@ void p_x11_window_docked_fullscreen(PDisplayInfo *display_info)
 	configure_event.width = width;
 	configure_event.height = height;
 	configure_event.border_width = 0;
-	xcb_send_event(display_info->connection, 0, display_info->screen->root, XCB_EVENT_MASK_STRUCTURE_NOTIFY, (const char *)&configure_event);
+	xcb_send_event(display_info->connection, 0, display_info->screen->root, XCB_EVENT_MASK_STRUCTURE_NOTIFY,
+			(const char *)&configure_event);
 
 	xcb_map_window(display_info->connection, display_info->window);
 	xcb_flush(display_info->connection);
-
-
 }
 
 /**
@@ -506,7 +534,8 @@ void p_x11_window_windowed(PDisplayInfo *display_info, uint x, uint y, uint widt
 	configure_event.width = width;
 	configure_event.height = height;
 	configure_event.border_width = 0;
-	xcb_send_event(display_info->connection, 0, display_info->screen->root, XCB_EVENT_MASK_STRUCTURE_NOTIFY, (const char *)&configure_event);
+	xcb_send_event(display_info->connection, 0, display_info->screen->root, XCB_EVENT_MASK_STRUCTURE_NOTIFY,
+			(const char *)&configure_event);
 
 	xcb_unmap_window(display_info->connection, display_info->window);
 	xcb_flush(display_info->connection);

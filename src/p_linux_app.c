@@ -1,5 +1,6 @@
 #include "phantom.h"
 #include <stdlib.h>
+#include <stdio.h>
 #include <locale.h>
 
 /**
@@ -14,6 +15,15 @@ PAppInstance *p_linux_app_init(void)
 	setlocale(LC_ALL, "");
 
 	PAppInstance *app_instance = malloc(sizeof *app_instance);
+
+
+	app_instance->window_mutex = malloc(sizeof *app_instance->window_mutex);
+	if (mtx_init(app_instance->window_mutex, mtx_plain) != thrd_success)
+	{
+		fprintf(stderr, "Error initializing window mutex...\n");
+		exit(1);
+	}
+
 
 	// create the window array
 	app_instance->window_settings = e_dynarr_init(sizeof (PWindowSettings *), 1);
@@ -32,11 +42,28 @@ PAppInstance *p_linux_app_init(void)
 void p_linux_app_deinit(PAppInstance *app_instance)
 {
 	// close all windows
-	while(app_instance->window_settings->num_items > 0)
+	//uint num_windows = app_instance->window_settings->num_items;
+	//PWindowSettings **window_settings = malloc(sizeof (PWindowSettings *) * num_windows);
+	//for (uint i = 0; i < app_instance->window_settings->num_items; i++)
+	//	window_settings[i] = ((PWindowSettings **)app_instance->window_settings->arr)[i];
+
+	//for (uint i = 0; i < num_windows; i++)
+	while (app_instance->window_settings->num_items > 0)
 	{
-		p_window_close(app_instance, *(PWindowSettings **)app_instance->window_settings->arr);
+		int result;
+		PWindowSettings *window_settings = *((PWindowSettings **)app_instance->window_settings->arr);
+		p_window_close(app_instance, window_settings);
+		if (thrd_join(*window_settings->event_manager, &result) != thrd_success)
+		{
+			fprintf(stderr, "Error joining window event manager...\n");
+			exit(1);
+		}
 	}
 	e_dynarr_deinit(app_instance->window_settings);
+	//free(window_settings);
+
 	p_event_deinit(app_instance->input_manager);
+	mtx_destroy(app_instance->window_mutex);
+	free(app_instance->window_mutex);
 	free(app_instance);
 }

@@ -2,6 +2,7 @@
 #define _PHANTOM_H
 
 #include "enigma.h"
+#include <threads.h>
 
 #ifndef _UINT
 #define _UINT
@@ -72,6 +73,7 @@ struct PWindowSettings {
 	uint height;
 	enum PWindowDisplayType display_type;
 	enum PWindowInteractType interact_type;
+	thrd_t *event_manager;
 	PEventCalls *event_calls;
 	PDisplayInfo *display_info;
 };
@@ -102,6 +104,7 @@ struct PWindowRequest {
 struct PAppInstance {
 	EDynarr *window_settings; // Array of (PWindowSettings *)
 	PDeviceManager *input_manager;
+	mtx_t *window_mutex;
 };
 
 
@@ -110,6 +113,8 @@ struct PAppInstance {
 #ifdef _PHANTOM_X11
 
 #include <xcb/xcb.h>
+
+// MUTEX for window-based operations
 
 /**
  * PAtomTypes
@@ -145,7 +150,6 @@ struct PDisplayInfo {
 
 #define p_window_create p_x11_window_create
 #define p_window_close p_x11_window_close
-
 #define p_window_fullscreen p_x11_window_fullscreen
 #define p_window_docked_fullscreen p_x11_window_docked_fullscreen
 #define p_window_windowed p_x11_window_windowed
@@ -159,7 +163,7 @@ void p_x11_window_fullscreen(PDisplayInfo *display_info);
 void p_x11_window_docked_fullscreen(PDisplayInfo *display_info);
 void p_x11_window_windowed(PDisplayInfo *display_info, uint x, uint y, uint width, uint height);
 void p_x11_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height);
-void *p_x11_window_event_manage(void *args);
+int p_x11_window_event_manage(void *args);
 
 #endif
 
