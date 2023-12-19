@@ -18,12 +18,7 @@ PAppInstance *p_linux_app_init(void)
 
 
 	app_instance->window_mutex = malloc(sizeof *app_instance->window_mutex);
-	if (mtx_init(app_instance->window_mutex, mtx_plain) != thrd_success)
-	{
-		fprintf(stderr, "Error initializing window mutex...\n");
-		exit(1);
-	}
-
+	e_mutex_init(app_instance->window_mutex, NULL);
 
 	// create the window array
 	app_instance->window_settings = e_dynarr_init(sizeof (PWindowSettings *), 1);
@@ -43,17 +38,11 @@ void p_linux_app_deinit(PAppInstance *app_instance)
 {
 	while (app_instance->window_settings->num_items > 0)
 	{
-		int result;
 		PWindowSettings *window_settings = *((PWindowSettings **)app_instance->window_settings->arr);
 		window_settings->deinit = true;
-		p_window_close(app_instance, window_settings);
-		if (thrd_join(*window_settings->event_manager, &result) != thrd_success)
-		{
-			fprintf(stderr, "Error joining window event manager...\n");
-			exit(1);
-		}
+		p_window_close(window_settings);
+		e_thread_join(window_settings->event_manager);
 		free(window_settings->event_calls);
-		free(window_settings->event_manager);
 		free(window_settings->name);
 		free(window_settings);
 		e_dynarr_remove_unordered_ptr(app_instance->window_settings, window_settings);
@@ -62,7 +51,7 @@ void p_linux_app_deinit(PAppInstance *app_instance)
 	//free(window_settings);
 
 	p_event_deinit(app_instance->input_manager);
-	mtx_destroy(app_instance->window_mutex);
+	e_mutex_destroy(app_instance->window_mutex);
 	free(app_instance->window_mutex);
 	free(app_instance);
 }

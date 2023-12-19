@@ -161,24 +161,15 @@ void p_x11_window_create(PAppInstance *app_instance, const PWindowRequest window
 			exit(1);
 	}
 
-	mtx_lock(app_instance->window_mutex);
+	e_mutex_lock(app_instance->window_mutex);
 	e_dynarr_add(app_instance->window_settings, &window_settings);
-	mtx_unlock(app_instance->window_mutex);
+	e_mutex_unlock(app_instance->window_mutex);
 
-	// TODO: make wrapper for pthreads
 	// Start the window event manager
-	thrd_t *thread_xcb_event_manager = malloc(sizeof *thread_xcb_event_manager);
-	window_settings->event_manager = thread_xcb_event_manager;
-
-	void *args = malloc(sizeof (PAppInstance *) + sizeof (PWindowSettings *));
+	EThreadArguments args = malloc(sizeof (PAppInstance *) + sizeof (PWindowSettings *));
 	memcpy(args, &app_instance, sizeof (PAppInstance **));
 	memcpy(&((char *)args)[sizeof (PAppInstance **)], &window_settings, sizeof (PWindowSettings **));
-
-	if(thrd_create(thread_xcb_event_manager, p_window_event_manage, args) != thrd_success)
-	{
-		fprintf(stderr, "Error creating window event manager...\n");
-		exit(1);
-	}
+	window_settings->event_manager = e_thread_create(p_window_event_manage, args);
 }
 
 /**
@@ -186,7 +177,7 @@ void p_x11_window_create(PAppInstance *app_instance, const PWindowRequest window
  *
  * sends a signal to close the window and the connection to the Xserver
  */
-void p_x11_window_close(PAppInstance *app_instance, PWindowSettings *window_settings)
+void p_x11_window_close(PWindowSettings *window_settings)
 {
 	xcb_destroy_window(window_settings->display_info->connection, window_settings->display_info->window);
 	xcb_flush(window_settings->display_info->connection);
@@ -201,7 +192,7 @@ void p_x11_window_close(PAppInstance *app_instance, PWindowSettings *window_sett
 void _x11_window_close(PAppInstance *app_instance, PWindowSettings *window_settings)
 {
 	// If window exists delete it.
-	mtx_lock(app_instance->window_mutex);
+	e_mutex_lock(app_instance->window_mutex);
 	int index = e_dynarr_contains(app_instance->window_settings, &window_settings);
 	if (index == -1)
 	{
@@ -215,21 +206,21 @@ void _x11_window_close(PAppInstance *app_instance, PWindowSettings *window_setti
 	if (!window_settings->deinit)
 	{
 		free(window_settings->event_calls);
-		free(window_settings->event_manager);
 		free(window_settings->name);
 		free(window_settings);
+		e_thread_detach(e_thread_self());
 	}
 	e_dynarr_remove_unordered(app_instance->window_settings, index);
-	mtx_unlock(app_instance->window_mutex);
+	e_mutex_unlock(app_instance->window_mutex);
 }
 
 /**
  * p_x11_window_event_manage
  *
  * This function runs in its own thread and manages window manager events
- * Right now args is useless
+ * returns NULL
  */
-int p_x11_window_event_manage(void *args)
+EThreadResult p_x11_window_event_manage(EThreadArguments args)
 {
 	// unpack args
 	PAppInstance *app_instance = ((PAppInstance **)args)[0];
@@ -387,7 +378,7 @@ int p_x11_window_event_manage(void *args)
 		free(event);
 	}
 	free(args);
-	return 0;
+	return NULL;
 }
 
 /**

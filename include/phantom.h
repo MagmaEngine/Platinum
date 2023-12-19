@@ -2,7 +2,6 @@
 #define _PHANTOM_H
 
 #include "enigma.h"
-#include <threads.h>
 
 #ifndef _UINT
 #define _UINT
@@ -28,6 +27,7 @@ typedef struct PDisplayInfo PDisplayInfo;
 typedef struct PEventCalls PEventCalls;
 typedef struct PWindowRequest PWindowRequest;
 typedef struct PWindowSettings PWindowSettings;
+typedef void * PEventArguments;
 
 /**
  * PEventCalls
@@ -46,17 +46,17 @@ struct PEventCalls {
 	bool enable_map;
 	bool enable_unmap;
 	bool enable_destroy;
-	void (*expose)(void *);
-	void (*configure)(void *);
-	void (*property)(void *);
-	void (*client)(void *);
-	void (*focus_in)(void *);
-	void (*focus_out)(void *);
-	void (*enter)(void *);
-	void (*leave)(void *);
-	void (*map)(void *);
-	void (*unmap)(void *);
-	void (*destroy)(void *);
+	void (*expose)(PEventArguments);
+	void (*configure)(PEventArguments);
+	void (*property)(PEventArguments);
+	void (*client)(PEventArguments);
+	void (*focus_in)(PEventArguments);
+	void (*focus_out)(PEventArguments);
+	void (*enter)(PEventArguments);
+	void (*leave)(PEventArguments);
+	void (*map)(PEventArguments);
+	void (*unmap)(PEventArguments);
+	void (*destroy)(PEventArguments);
 };
 
 /**
@@ -73,7 +73,7 @@ struct PWindowSettings {
 	uint height;
 	enum PWindowDisplayType display_type;
 	enum PWindowInteractType interact_type;
-	thrd_t *event_manager;
+	EThread event_manager;
 	PEventCalls *event_calls;
 	PDisplayInfo *display_info;
 	bool deinit;
@@ -105,7 +105,7 @@ struct PWindowRequest {
 struct PAppInstance {
 	EDynarr *window_settings; // Array of (PWindowSettings *)
 	PDeviceManager *input_manager;
-	mtx_t *window_mutex;
+	EMutex *window_mutex;
 };
 
 
@@ -159,12 +159,12 @@ struct PDisplayInfo {
 
 
 void p_x11_window_create(PAppInstance *app_instance, const PWindowRequest window_request);
-void p_x11_window_close(PAppInstance *app_instance, PWindowSettings *window_settings);
+void p_x11_window_close(PWindowSettings *window_settings);
 void p_x11_window_fullscreen(PDisplayInfo *display_info);
 void p_x11_window_docked_fullscreen(PDisplayInfo *display_info);
 void p_x11_window_windowed(PDisplayInfo *display_info, uint x, uint y, uint width, uint height);
 void p_x11_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height);
-int p_x11_window_event_manage(void *args);
+void *p_x11_window_event_manage(void *args);
 
 #endif
 
@@ -219,7 +219,7 @@ void p_linux_event_deinit(PDeviceManager *input_manager);
 #endif
 
 
-// Windowindow_settings systems
+// Windows systems
 #ifdef _PHANTOM_WIN32
 
 #include <windowindow_settings.h>
@@ -240,7 +240,7 @@ void p_win32_window_windowed(PDisplayInfo *display_info, PWindowSettings *window
 #endif // _PHANTOM_WIN32
 
 
-// Windowindow_settings systems
+// Windows systems
 #ifdef _PHANTOM_WINDOWS
 
 typedef struct {

@@ -1,4 +1,4 @@
-phantom_srcs = files('src/p_linux_events.c')
+phantom_srcs = files()
 
 phantom_deps = [
   dep_libenigma,
