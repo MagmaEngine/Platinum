@@ -124,6 +124,8 @@ struct PAppInstance {
  * for quick lookup later
  */
 enum PAtomTypes {
+	P_ATOM_UTF8_STRING,
+	P_ATOM_NET_WM_NAME,
 	P_ATOM_NET_WM_STATE,
 	P_ATOM_NET_WM_STATE_FULLSCREEN,
 	P_ATOM_NET_WM_DECORATION,
@@ -154,7 +156,8 @@ struct PDisplayInfo {
 #define p_window_fullscreen p_x11_window_fullscreen
 #define p_window_docked_fullscreen p_x11_window_docked_fullscreen
 #define p_window_windowed p_x11_window_windowed
-
+#define p_window_set_dimensions p_x11_window_set_dimensions
+#define p_window_set_name p_x11_window_set_name
 #define p_window_event_manage p_x11_window_event_manage
 
 
@@ -164,7 +167,8 @@ void p_x11_window_fullscreen(PDisplayInfo *display_info);
 void p_x11_window_docked_fullscreen(PDisplayInfo *display_info);
 void p_x11_window_windowed(PDisplayInfo *display_info, uint x, uint y, uint width, uint height);
 void p_x11_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height);
-void *p_x11_window_event_manage(void *args);
+void p_x11_window_set_name(PDisplayInfo *display_info, wchar_t *name);
+EThreadResult p_x11_window_event_manage(EThreadArguments args);
 
 #endif
 
@@ -173,8 +177,8 @@ void *p_x11_window_event_manage(void *args);
 #ifdef _PHANTOM_WAYLAND
 
 #include <wayland-client.h>
-typedef struct {
-} PDisplayInfo;
+struct PDisplayInfo{
+};
 
 #define p_window_create p_wayland_window_create
 #define p_window_close p_wayland_window_close
@@ -222,29 +226,29 @@ void p_linux_event_deinit(PDeviceManager *input_manager);
 // Windows systems
 #ifdef _PHANTOM_WIN32
 
-#include <windowindow_settings.h>
-typedef struct {
+#include <windows.h>
+struct PDisplayInfo{
 	HWND hwnd;
-} PDisplayInfo;
+};
 
 #define p_window_create p_win32_window_create
 #define p_window_close p_win32_window_close
 #define p_window_fullscreen p_win32_window_fullscreen
 
-PDisplayInfo *p_win32_window_create(char *name, PWindowDisplayType *display_type);
-void p_win32_window_close(PDisplayInfo *display_info);
-void p_win32_window_fullscreen(PDisplayInfo *display_info, PWindowSettings *window_settings);
-void p_win32_window_windowed_fullscreen(PDisplayInfo *display_info, PWindowSettings *window_settings);
-void p_win32_window_windowed(PDisplayInfo *display_info, PWindowSettings *window_settings);
+void p_win32_window_create(PAppInstance *app_instance, const PWindowRequest window_request);
+void p_win32_window_close(PWindowSettings *window_settings);
+void p_win32_window_fullscreen(PDisplayInfo *display_info);
+void p_win32_window_docked_fullscreen(PDisplayInfo *display_info);
+void p_win32_window_windowed(PDisplayInfo *display_info, uint x, uint y, uint width, uint height);
+void p_win32_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height);
+EThreadResult p_win32_window_event_manage(EThreadArguments args);
+
 
 #endif // _PHANTOM_WIN32
 
 
 // Windows systems
 #ifdef _PHANTOM_WINDOWS
-
-typedef struct {
-} PGameInstance;
 
 #endif
 

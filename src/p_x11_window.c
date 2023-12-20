@@ -8,21 +8,6 @@
 #include <xcb/xcb.h>
 
 /**
- * p_x11_window_set_dimensions
- *
- * updates window_settings with the values provided as x, y, width, and heigth
- * and submits a request to the WM to resize the window
- */
-void p_x11_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height)
-{
-	// resize
-	uint32_t params[4] = {x, y, width, height};
-	xcb_configure_window(display_info->connection, display_info->window,
-			XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y | XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT,
-			params);
-}
-
-/**
  * p_x11_generate_atom
  *
  * generates an xcb atom and returns it.
@@ -40,6 +25,53 @@ xcb_atom_t p_x11_generate_atom(xcb_connection_t *connection, const char *atom_na
 	free(reply);
 	return atom;
 }
+
+/**
+ * p_x11_window_set_dimensions
+ *
+ * updates window_settings with the values provided as x, y, width, and heigth
+ * and submits a request to the WM to resize the window
+ */
+void p_x11_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height)
+{
+	// resize
+	uint32_t params[4] = {x, y, width, height};
+	xcb_configure_window(display_info->connection, display_info->window,
+			XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y | XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT,
+			params);
+}
+
+/**
+ * p_x11_window_set_name
+ *
+ * sets the name of the window
+ */
+void p_x11_window_set_name(PDisplayInfo *display_info, wchar_t *name)
+{
+	// convert name to char*
+	size_t utf8_size = wcstombs(NULL, name, 0);
+	char *utf8_name = malloc(utf8_size + 1);
+	wcstombs(utf8_name, name, utf8_size);
+	utf8_name[utf8_size] = '\0';
+
+	xcb_change_property(display_info->connection, XCB_PROP_MODE_REPLACE, display_info->window, XCB_ATOM_WM_NAME,
+			display_info->atoms[P_ATOM_UTF8_STRING], 8, utf8_size, utf8_name);
+
+	xcb_change_property(display_info->connection, XCB_PROP_MODE_REPLACE, display_info->window,
+			display_info->atoms[P_ATOM_NET_WM_NAME], display_info->atoms[P_ATOM_UTF8_STRING], 8, utf8_size, utf8_name);
+
+	free(utf8_name);
+}
+
+/**
+ * p_x11_window_set_icon
+ *
+ * sets the icon of the window
+ */
+void p_x11_window_set_icon(PDisplayInfo *display_info, uint32_t *icon)
+{
+}
+
 
 /**
  * p_x11_window_create
@@ -66,6 +98,8 @@ void p_x11_window_create(PAppInstance *app_instance, const PWindowRequest window
 	display_info->connection = connection;
 	display_info->screen = screen;
 	display_info->window = window;
+	display_info->atoms[P_ATOM_UTF8_STRING] = p_x11_generate_atom(display_info->connection, "UTF8_STRING");
+	display_info->atoms[P_ATOM_NET_WM_NAME] = p_x11_generate_atom(display_info->connection, "_NET_WM_NAME");
 	display_info->atoms[P_ATOM_NET_WM_STATE] = p_x11_generate_atom(display_info->connection, "_NET_WM_STATE");
 	display_info->atoms[P_ATOM_NET_WM_STATE_FULLSCREEN] = p_x11_generate_atom(display_info->connection,
 			"_NET_WM_STATE_FULLSCREEN");
@@ -139,6 +173,8 @@ void p_x11_window_create(PAppInstance *app_instance, const PWindowRequest window
 		XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY |
 		XCB_EVENT_MASK_FOCUS_CHANGE;
 	xcb_change_window_attributes(connection, window, XCB_CW_EVENT_MASK, &event_mask);
+
+	p_window_set_name(display_info, window_settings->name);
 
 	// Set display based on type
 	switch (window_request.display_type)

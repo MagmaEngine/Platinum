@@ -18,7 +18,7 @@ PAppInstance *p_linux_app_init(void)
 
 
 	app_instance->window_mutex = malloc(sizeof *app_instance->window_mutex);
-	e_mutex_init(app_instance->window_mutex, NULL);
+	e_mutex_init(app_instance->window_mutex);
 
 	// create the window array
 	app_instance->window_settings = e_dynarr_init(sizeof (PWindowSettings *), 1);
