@@ -427,7 +427,7 @@ EThreadResult p_x11_window_event_manage(EThreadArguments args)
 /**
  * p_x11_window_fullscreen
  *
- * sets the window in display_info to fullscreen
+ * sets the window in window_settings to fullscreen
  */
 void p_x11_window_fullscreen(PWindowSettings *window_settings)
 {
@@ -471,9 +471,9 @@ void p_x11_window_fullscreen(PWindowSettings *window_settings)
 }
 
 /**
- * p_x11_window_windowed_fullscreen
+ * p_x11_window_docked_fullscreen
  *
- * sets the window in display_info to (borderless/windowed) fullscreen
+ * sets the window in window_settings to (borderless/windowed) fullscreen
  */
 void p_x11_window_docked_fullscreen(PWindowSettings *window_settings)
 {
@@ -532,7 +532,7 @@ void p_x11_window_docked_fullscreen(PWindowSettings *window_settings)
 /**
  * p_x11_window_windowed
  *
- * sets the window in display_info to windowed mode and sets the dimensions
+ * sets the window in window_settings to windowed mode and sets the dimensions
  */
 void p_x11_window_windowed(PWindowSettings *window_settings, uint x, uint y, uint width, uint height)
 {

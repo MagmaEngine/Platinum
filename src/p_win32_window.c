@@ -5,6 +5,11 @@
 HBRUSH hBrush;
 void _win32_window_close(PAppInstance *app_instance, PWindowSettings *window_settingsi);
 
+/**
+ * WindowProc
+ *
+ * This internal function gets run by the event manager and responds to different messages
+ */
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	void *window_data = (void *)GetWindowLongPtr(hwnd, GWLP_USERDATA);
@@ -51,6 +56,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			return 0;
 		}
 		case WM_SIZE:
+		case WM_EXITSIZEMOVE:
 		{
 			PWindowSettings *window_settings = *(PWindowSettings **)&((char *)window_data)[sizeof (PAppInstance **)];
 			RECT windowRect;
@@ -60,18 +66,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			window_settings->y = windowRect.top;
 			window_settings->width = LOWORD(lParam);
 			window_settings->height = HIWORD(lParam);
-
-			// Check if the window is maximized and covers the entire screen
-			WINDOWPLACEMENT placement = {0};
-			if (GetWindowPlacement(hwnd, &placement))
-			{
-				if (!(GetWindowLong(hwnd, GWL_STYLE) & WS_OVERLAPPEDWINDOW) &&
-						window_settings->display_info->screen_width == window_settings->width &&
-						window_settings->display_info->screen_height == window_settings->height)
-				{
-					window_settings->display_type = P_DISPLAY_DOCKED_FULLSCREEN;
-				}
-			}
 
 			InvalidateRect(hwnd, NULL, TRUE);
 
@@ -83,6 +77,33 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	}
 }
 
+/**
+ * p_win32_window_set_dimensions
+ *
+ * updates window_settings with the values provided as x, y, width, and heigth
+ */
+void p_win32_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height)
+{
+	SetWindowPos(display_info->hwnd, HWND_TOP, x, y, width, height, SWP_FRAMECHANGED);
+	UpdateWindow(display_info->hwnd);
+}
+
+/**
+ * p_win32_window_set_name
+ *
+ * sets the name of the window
+ */
+void p_win32_window_set_name(PDisplayInfo *display_info, wchar_t *name)
+{
+	SetWindowTextW(display_info->hwnd, name);
+}
+
+/**
+ * p_win32_window_create
+ *
+ * creates a window with parameters set from window_request.
+ * returns a window_settings associated with the window.
+ */
 void p_win32_window_create(PAppInstance *app_instance, const PWindowRequest window_request)
 {
 	PDisplayInfo *display_info = malloc(sizeof *display_info);
@@ -108,12 +129,12 @@ void p_win32_window_create(PAppInstance *app_instance, const PWindowRequest wind
 	WNDCLASSW windowClass = {0};
 	windowClass.lpfnWndProc = WindowProc;
 	windowClass.hInstance = display_info->hInstance;
-	windowClass.lpszClassName = L"MyWindowClass";
+	windowClass.lpszClassName = L"PhantomWindowClass";
 	RegisterClassW(&windowClass);
 
 	display_info->hwnd = CreateWindowExW(
 			0,
-			L"MyWindowClass",
+			L"PhantomWindowClass",
 			window_settings->name,
 			WS_OVERLAPPEDWINDOW|WS_VISIBLE,
 			window_settings->x, window_settings->y, window_settings->width, window_settings->height,
@@ -153,8 +174,6 @@ void p_win32_window_create(PAppInstance *app_instance, const PWindowRequest wind
 	e_mutex_unlock(app_instance->window_mutex);
 
 	// Display the window
-	ShowWindow(display_info->hwnd, SW_SHOWNORMAL);
-	UpdateWindow(display_info->hwnd);
 
 	// Start the window event manager
 	EThreadArguments args = malloc(sizeof (PAppInstance *) + sizeof (PWindowSettings *));
@@ -165,6 +184,11 @@ void p_win32_window_create(PAppInstance *app_instance, const PWindowRequest wind
 	SetWindowLongPtr(display_info->hwnd, GWLP_USERDATA, (LONG_PTR)args);
 }
 
+/**
+ * p_win32_window_close
+ *
+ * sends a signal to close the window and the event manager
+ */
 void p_win32_window_close(PWindowSettings *window_settings)
 {
 	window_settings->status = P_WINDOW_INTERNAL_CLOSE;
@@ -175,6 +199,11 @@ void p_win32_window_close(PWindowSettings *window_settings)
 		CloseHandle(window_settings->event_manager);
 }
 
+/**
+ * _win32_window_close
+ *
+ * internal close function that actually closes the window and frees data
+ */
 void _win32_window_close(PAppInstance *app_instance, PWindowSettings *window_settings)
 {
 	// If window exists delete it.
@@ -197,6 +226,12 @@ void _win32_window_close(PAppInstance *app_instance, PWindowSettings *window_set
 	e_mutex_unlock(app_instance->window_mutex);
 }
 
+/**
+ * p_win32_window_event_manage
+ *
+ * This function runs in its own thread and manages window manager events
+ * returns 0
+ */
 EThreadResult p_win32_window_event_manage(EThreadArguments args)
 {
 	PWindowSettings *window_settings = *(PWindowSettings **)&((char *)args)[sizeof (PAppInstance **)];
@@ -214,6 +249,11 @@ EThreadResult p_win32_window_event_manage(EThreadArguments args)
 	return 0;
 }
 
+/**
+ * p_win32_window_fullscreen
+ *
+ * sets the window in window_settings to fullscreen
+ */
 void p_win32_window_fullscreen(PWindowSettings *window_settings)
 {
 	DEVMODE devMode = {0};
@@ -222,32 +262,56 @@ void p_win32_window_fullscreen(PWindowSettings *window_settings)
 	devMode.dmPelsHeight = GetSystemMetrics(SM_CYSCREEN);
 	devMode.dmBitsPerPel = 32; // Adjust as needed
 	devMode.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT | DM_BITSPERPEL;
+	ShowWindow(window_settings->display_info->hwnd, SW_HIDE);
 	if (ChangeDisplaySettings(&devMode, CDS_FULLSCREEN) == DISP_CHANGE_SUCCESSFUL)
 	{
 		SetWindowLong(window_settings->display_info->hwnd, GWL_STYLE, WS_POPUP);
 		SetWindowPos(window_settings->display_info->hwnd, HWND_TOP, 0, 0, devMode.dmPelsWidth, devMode.dmPelsHeight, SWP_FRAMECHANGED);
 		window_settings->display_type = P_DISPLAY_FULLSCREEN;
 	}
+	ShowWindow(window_settings->display_info->hwnd, SW_SHOWNORMAL);
+	UpdateWindow(window_settings->display_info->hwnd);
 }
 
+/**
+ * p_win32_window_docked_fullscreen
+ *
+ * sets the window in window_settings to (borderless/windowed) fullscreen
+ */
 void p_win32_window_docked_fullscreen(PWindowSettings *window_settings)
 {
-	if (ChangeDisplaySettings(NULL, 0) == DISP_CHANGE_SUCCESSFUL)
+	if (window_settings->display_type == P_DISPLAY_FULLSCREEN)
 	{
-		SetWindowLong(window_settings->display_info->hwnd, GWL_STYLE,
-				GetWindowLong(window_settings->display_info->hwnd, GWL_STYLE) & ~WS_OVERLAPPEDWINDOW);
-		SetWindowPos(window_settings->display_info->hwnd, HWND_TOP, 0, 0, window_settings->display_info->screen_width,
-				window_settings->display_info->screen_height, SWP_FRAMECHANGED);
-		window_settings->display_type = P_DISPLAY_DOCKED_FULLSCREEN;
+		ShowWindow(window_settings->display_info->hwnd, SW_HIDE);
+		if (ChangeDisplaySettings(NULL, 0) != DISP_CHANGE_SUCCESSFUL)
+			return;
 	}
+	SetWindowLong(window_settings->display_info->hwnd, GWL_STYLE,
+			GetWindowLong(window_settings->display_info->hwnd, GWL_STYLE) & ~WS_OVERLAPPEDWINDOW);
+	SetWindowPos(window_settings->display_info->hwnd, HWND_TOP, 0, 0, window_settings->display_info->screen_width,
+			window_settings->display_info->screen_height, SWP_FRAMECHANGED);
+	window_settings->display_type = P_DISPLAY_DOCKED_FULLSCREEN;
+
+	ShowWindow(window_settings->display_info->hwnd, SW_SHOWNORMAL);
+	UpdateWindow(window_settings->display_info->hwnd);
 }
 
+/**
+ * p_win32_window_windowed
+ *
+ * sets the window in window_settings to windowed mode and sets the dimensions
+ */
 void p_win32_window_windowed(PWindowSettings *window_settings, uint x, uint y, uint width, uint height)
 {
-	if (ChangeDisplaySettings(NULL, 0) == DISP_CHANGE_SUCCESSFUL)
+	if (window_settings->display_type == P_DISPLAY_FULLSCREEN)
 	{
-		SetWindowLong(window_settings->display_info->hwnd, GWL_STYLE, WS_OVERLAPPEDWINDOW);
-		SetWindowPos(window_settings->display_info->hwnd, HWND_TOP, x, y, width, height, SWP_FRAMECHANGED);
-		window_settings->display_type = P_DISPLAY_WINDOWED;
+		ShowWindow(window_settings->display_info->hwnd, SW_HIDE);
+		if (ChangeDisplaySettings(NULL, 0) != DISP_CHANGE_SUCCESSFUL)
+			return;
 	}
+	SetWindowLong(window_settings->display_info->hwnd, GWL_STYLE, WS_OVERLAPPEDWINDOW);
+	SetWindowPos(window_settings->display_info->hwnd, HWND_TOP, x, y, width, height, SWP_FRAMECHANGED);
+	window_settings->display_type = P_DISPLAY_WINDOWED;
+	ShowWindow(window_settings->display_info->hwnd, SW_SHOWNORMAL);
+	UpdateWindow(window_settings->display_info->hwnd);
 }
