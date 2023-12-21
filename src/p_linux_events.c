@@ -1,7 +1,5 @@
 #include "phantom.h"
-#include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
 #include <libudev.h>
 #include <libevdev/libevdev.h>
 #include <libevdev/libevdev-uinput.h>

@@ -21,6 +21,13 @@ enum PWindowInteractType {
 	P_INTERACT_MAX
 };
 
+enum PWindowStatus {
+	P_WINDOW_ALIVE,
+	P_WINDOW_CLOSE,
+	P_WINDOW_INTERNAL_CLOSE,
+	P_WINDOW_MAX
+};
+
 typedef struct PAppInstance PAppInstance;
 typedef struct PDeviceManager PDeviceManager;
 typedef struct PDisplayInfo PDisplayInfo;
@@ -73,10 +80,10 @@ struct PWindowSettings {
 	uint height;
 	enum PWindowDisplayType display_type;
 	enum PWindowInteractType interact_type;
+	enum PWindowStatus status;
 	EThread event_manager;
 	PEventCalls *event_calls;
 	PDisplayInfo *display_info;
-	bool deinit;
 };
 
 /**
@@ -227,13 +234,29 @@ void p_linux_event_deinit(PDeviceManager *input_manager);
 #ifdef _PHANTOM_WIN32
 
 #include <windows.h>
+
+/**
+ * PDisplayInfo
+ *
+ * This struct holds all the low-level display information
+ * Values here should never be set directly
+ */
 struct PDisplayInfo{
 	HWND hwnd;
+	HINSTANCE hInstance;
+	uint screen_width;
+	uint screen_height;
 };
 
 #define p_window_create p_win32_window_create
 #define p_window_close p_win32_window_close
 #define p_window_fullscreen p_win32_window_fullscreen
+#define p_window_docked_fullscreen p_win32_window_docked_fullscreen
+#define p_window_windowed p_win32_window_windowed
+#define p_window_set_dimensions p_win32_window_set_dimensions
+#define p_window_set_name p_win32_window_set_name
+#define p_window_event_manage p_win32_window_event_manage
+
 
 void p_win32_window_create(PAppInstance *app_instance, const PWindowRequest window_request);
 void p_win32_window_close(PWindowSettings *window_settings);
@@ -241,6 +264,7 @@ void p_win32_window_fullscreen(PDisplayInfo *display_info);
 void p_win32_window_docked_fullscreen(PDisplayInfo *display_info);
 void p_win32_window_windowed(PDisplayInfo *display_info, uint x, uint y, uint width, uint height);
 void p_win32_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height);
+void p_win32_window_set_name(PDisplayInfo *display_info, wchar_t *name);
 EThreadResult p_win32_window_event_manage(EThreadArguments args);
 
 
@@ -249,6 +273,31 @@ EThreadResult p_win32_window_event_manage(EThreadArguments args);
 
 // Windows systems
 #ifdef _PHANTOM_WINDOWS
+
+/**
+ * PDeviceManager
+ *
+ * This struct holds all the device handles and event monitors
+ * TODO: use me
+ */
+struct PDeviceManager {
+	EDynarr *udev_monitors;
+	EDynarr *libevs;
+	EDynarr *libev_uinputs;
+};
+
+#define p_event_init p_windows_event_init
+#define p_app_init p_windows_app_init
+
+#define p_event_deinit p_windows_event_deinit
+#define p_app_deinit p_windows_app_deinit
+
+PAppInstance *p_windows_app_init(void);
+PDeviceManager *p_windows_event_init(void);
+
+void p_windows_app_deinit(PAppInstance *app_instance);
+void p_windows_event_deinit(PDeviceManager *input_manager);
+
 
 #endif
 

@@ -5,8 +5,6 @@ phantom_deps = [
   dep_vulkan,
   ]
 
-message(host_machine.system())
-
 ## Phantom build setup
 # Check OS
 if target_os == 'windows'
@@ -14,8 +12,8 @@ elif target_os == 'linux'
   dep_evdev = dependency('libevdev', required : true)
   dep_udev = dependency('libudev', required : true)
   phantom_srcs += [
-    files('src/p_linux_events.c'),
     files('src/p_linux_app.c'),
+    files('src/p_linux_events.c'),
     ]
   phantom_deps += [
     dep_evdev,
@@ -27,6 +25,8 @@ endif
 if target_display == 'windows'
   phantom_srcs += [
     files('src/p_win32_window.c'),
+    files('src/p_windows_app.c'),
+    files('src/p_windows_events.c'),
   ]
 elif target_display == 'x11'
   phantom_deps += dep_x11

@@ -142,7 +142,7 @@ void p_x11_window_create(PAppInstance *app_instance, const PWindowRequest window
 	window_settings->display_info = display_info;
 	window_settings->event_calls = calloc(1, sizeof *window_settings->event_calls);
 	memcpy(window_settings->event_calls, &window_request.event_calls, sizeof *window_settings->event_calls);
-	window_settings->deinit = false;
+	window_settings->status = P_WINDOW_ALIVE;
 
 	// creates the window
 	xcb_create_window(
@@ -215,6 +215,7 @@ void p_x11_window_create(PAppInstance *app_instance, const PWindowRequest window
  */
 void p_x11_window_close(PWindowSettings *window_settings)
 {
+	window_settings->status = P_WINDOW_INTERNAL_CLOSE;
 	xcb_destroy_window(window_settings->display_info->connection, window_settings->display_info->window);
 	xcb_flush(window_settings->display_info->connection);
 }
@@ -239,7 +240,7 @@ void _x11_window_close(PAppInstance *app_instance, PWindowSettings *window_setti
 	xcb_unmap_window(display_info->connection, display_info->window);
 	xcb_disconnect(display_info->connection);
 	free(window_settings->display_info);
-	if (!window_settings->deinit)
+	if (window_settings->status == P_WINDOW_CLOSE)
 	{
 		free(window_settings->event_calls);
 		free(window_settings->name);
@@ -266,12 +267,15 @@ EThreadResult p_x11_window_event_manage(EThreadArguments args)
 	PEventCalls *event_calls = window_settings->event_calls;
 
 
-	bool window_alive = true;
-	while (window_alive) {
+	while (window_settings->status == P_WINDOW_ALIVE) {
 		xcb_generic_event_t *event = xcb_wait_for_event(display_info->connection);
 		if (!event)
 		{
-			fprintf(stderr, "Event was null...\n");
+			fprintf(stdout, "PHANTOM: Warn: Event was null...\n");
+			e_mutex_lock(app_instance->window_mutex);
+			if (window_settings->status == P_WINDOW_ALIVE)
+				window_settings->status = P_WINDOW_CLOSE;
+			e_mutex_unlock(app_instance->window_mutex);
 			_x11_window_close(app_instance, window_settings);
 			break;
 		}
@@ -405,7 +409,10 @@ EThreadResult p_x11_window_event_manage(EThreadArguments args)
 				if (event_calls->enable_destroy && event_calls->destroy != NULL)
 					event_calls->destroy(destroy_notify_event);
 
-				window_alive = false;
+				e_mutex_lock(app_instance->window_mutex);
+				if (window_settings->status == P_WINDOW_ALIVE)
+					window_settings->status = P_WINDOW_CLOSE;
+				e_mutex_unlock(app_instance->window_mutex);
 				_x11_window_close(app_instance, window_settings);
 
 				break;
