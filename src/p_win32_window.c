@@ -41,6 +41,42 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			// Fill the background with the black brush
 			FillRect(hdc, &ps.rcPaint, hBrush);
 			EndPaint(hwnd, &ps);
+			return 0;
+		}
+		case WM_DISPLAYCHANGE:
+		{
+			PWindowSettings *window_settings = *(PWindowSettings **)&((char *)window_data)[sizeof (PAppInstance **)];
+			window_settings->display_info->screen_width = GetSystemMetrics(SM_CXSCREEN);
+			window_settings->display_info->screen_height = GetSystemMetrics(SM_CYSCREEN);
+			return 0;
+		}
+		case WM_SIZE:
+		{
+			PWindowSettings *window_settings = *(PWindowSettings **)&((char *)window_data)[sizeof (PAppInstance **)];
+			RECT windowRect;
+			GetWindowRect(hwnd, &windowRect);
+
+			window_settings->x = windowRect.left;
+			window_settings->y = windowRect.top;
+			window_settings->width = LOWORD(lParam);
+			window_settings->height = HIWORD(lParam);
+
+			// Check if the window is maximized and covers the entire screen
+			WINDOWPLACEMENT placement = {0};
+			if (GetWindowPlacement(hwnd, &placement))
+			{
+				if (!(GetWindowLong(hwnd, GWL_STYLE) & WS_OVERLAPPEDWINDOW) &&
+						window_settings->display_info->screen_width == window_settings->width &&
+						window_settings->display_info->screen_height == window_settings->height)
+				{
+					window_settings->display_type = P_DISPLAY_DOCKED_FULLSCREEN;
+				}
+			}
+
+			InvalidateRect(hwnd, NULL, TRUE);
+
+			printf("Resize: %i, %i, %i, %i\n", window_settings->x, window_settings->y, window_settings->width, window_settings->height);
+			return 0;
 		}
 		default:
 			return DefWindowProc(hwnd, uMsg, wParam, lParam);
@@ -95,16 +131,16 @@ void p_win32_window_create(PAppInstance *app_instance, const PWindowRequest wind
 	switch (window_request.display_type)
 	{
 		case P_DISPLAY_WINDOWED:
-			p_window_windowed(display_info, window_request.x, window_request.y, window_request.width,
+			p_window_windowed(window_settings, window_request.x, window_request.y, window_request.width,
 					window_request.height);
 		break;
 
 		case P_DISPLAY_DOCKED_FULLSCREEN:
-			p_window_docked_fullscreen(display_info);
+			p_window_docked_fullscreen(window_settings);
 		break;
 
 		case P_DISPLAY_FULLSCREEN:
-			p_window_fullscreen(display_info);
+			p_window_fullscreen(window_settings);
 		break;
 
 		case P_DISPLAY_MAX:
@@ -163,7 +199,6 @@ void _win32_window_close(PAppInstance *app_instance, PWindowSettings *window_set
 
 EThreadResult p_win32_window_event_manage(EThreadArguments args)
 {
-	PAppInstance *app_instance = ((PAppInstance **)args)[0];
 	PWindowSettings *window_settings = *(PWindowSettings **)&((char *)args)[sizeof (PAppInstance **)];
 
 	MSG msg = {0};
@@ -179,16 +214,40 @@ EThreadResult p_win32_window_event_manage(EThreadArguments args)
 	return 0;
 }
 
-void p_win32_window_fullscreen(PDisplayInfo *display_info)
+void p_win32_window_fullscreen(PWindowSettings *window_settings)
 {
-	SetWindowLong(display_info->hwnd, GWL_STYLE, GetWindowLong(display_info->hwnd, GWL_STYLE) & ~WS_OVERLAPPEDWINDOW);
-	SetWindowPos(display_info->hwnd, HWND_TOP, 0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN), SWP_FRAMECHANGED);
+	DEVMODE devMode = {0};
+	devMode.dmSize = sizeof(DEVMODE);
+	devMode.dmPelsWidth = GetSystemMetrics(SM_CXSCREEN);
+	devMode.dmPelsHeight = GetSystemMetrics(SM_CYSCREEN);
+	devMode.dmBitsPerPel = 32; // Adjust as needed
+	devMode.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT | DM_BITSPERPEL;
+	if (ChangeDisplaySettings(&devMode, CDS_FULLSCREEN) == DISP_CHANGE_SUCCESSFUL)
+	{
+		SetWindowLong(window_settings->display_info->hwnd, GWL_STYLE, WS_POPUP);
+		SetWindowPos(window_settings->display_info->hwnd, HWND_TOP, 0, 0, devMode.dmPelsWidth, devMode.dmPelsHeight, SWP_FRAMECHANGED);
+		window_settings->display_type = P_DISPLAY_FULLSCREEN;
+	}
 }
 
-void p_win32_window_docked_fullscreen(PDisplayInfo *display_info)
+void p_win32_window_docked_fullscreen(PWindowSettings *window_settings)
 {
+	if (ChangeDisplaySettings(NULL, 0) == DISP_CHANGE_SUCCESSFUL)
+	{
+		SetWindowLong(window_settings->display_info->hwnd, GWL_STYLE,
+				GetWindowLong(window_settings->display_info->hwnd, GWL_STYLE) & ~WS_OVERLAPPEDWINDOW);
+		SetWindowPos(window_settings->display_info->hwnd, HWND_TOP, 0, 0, window_settings->display_info->screen_width,
+				window_settings->display_info->screen_height, SWP_FRAMECHANGED);
+		window_settings->display_type = P_DISPLAY_DOCKED_FULLSCREEN;
+	}
 }
 
-void p_win32_window_windowed(PDisplayInfo *display_info, uint x, uint y, uint width, uint height)
+void p_win32_window_windowed(PWindowSettings *window_settings, uint x, uint y, uint width, uint height)
 {
+	if (ChangeDisplaySettings(NULL, 0) == DISP_CHANGE_SUCCESSFUL)
+	{
+		SetWindowLong(window_settings->display_info->hwnd, GWL_STYLE, WS_OVERLAPPEDWINDOW);
+		SetWindowPos(window_settings->display_info->hwnd, HWND_TOP, x, y, width, height, SWP_FRAMECHANGED);
+		window_settings->display_type = P_DISPLAY_WINDOWED;
+	}
 }

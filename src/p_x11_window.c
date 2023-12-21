@@ -180,16 +180,16 @@ void p_x11_window_create(PAppInstance *app_instance, const PWindowRequest window
 	switch (window_request.display_type)
 	{
 		case P_DISPLAY_WINDOWED:
-			p_window_windowed(display_info, window_request.x, window_request.y, window_request.width,
+			p_window_windowed(window_settings, window_request.x, window_request.y, window_request.width,
 					window_request.height);
 		break;
 
 		case P_DISPLAY_DOCKED_FULLSCREEN:
-			p_window_docked_fullscreen(display_info);
+			p_window_docked_fullscreen(window_settings);
 		break;
 
 		case P_DISPLAY_FULLSCREEN:
-			p_window_fullscreen(display_info);
+			p_window_fullscreen(window_settings);
 		break;
 
 		case P_DISPLAY_MAX:
@@ -429,8 +429,10 @@ EThreadResult p_x11_window_event_manage(EThreadArguments args)
  *
  * sets the window in display_info to fullscreen
  */
-void p_x11_window_fullscreen(PDisplayInfo *display_info)
+void p_x11_window_fullscreen(PWindowSettings *window_settings)
 {
+	PDisplayInfo *display_info = window_settings->display_info;
+
 	// set normal fullscreen window
 	xcb_change_property(display_info->connection, XCB_PROP_MODE_REPLACE, display_info->window,
 			display_info->atoms[P_ATOM_NET_WM_WINDOW_TYPE], XCB_ATOM_ATOM, 32, 1,
@@ -473,10 +475,12 @@ void p_x11_window_fullscreen(PDisplayInfo *display_info)
  *
  * sets the window in display_info to (borderless/windowed) fullscreen
  */
-void p_x11_window_docked_fullscreen(PDisplayInfo *display_info)
+void p_x11_window_docked_fullscreen(PWindowSettings *window_settings)
 {
+	PDisplayInfo *display_info = window_settings->display_info;
 	xcb_unmap_window(display_info->connection, display_info->window);
 	xcb_flush(display_info->connection);
+
 	// set windowed fullscreen window
 	xcb_delete_property(display_info->connection, display_info->window, display_info->atoms[P_ATOM_NET_WM_STATE]);
 	xcb_client_message_event_t ev_state;
@@ -530,8 +534,10 @@ void p_x11_window_docked_fullscreen(PDisplayInfo *display_info)
  *
  * sets the window in display_info to windowed mode and sets the dimensions
  */
-void p_x11_window_windowed(PDisplayInfo *display_info, uint x, uint y, uint width, uint height)
+void p_x11_window_windowed(PWindowSettings *window_settings, uint x, uint y, uint width, uint height)
 {
+	PDisplayInfo *display_info = window_settings->display_info;
+
 	// set normal window
 	xcb_delete_property(display_info->connection, display_info->window, display_info->atoms[P_ATOM_NET_WM_STATE]);
 	xcb_client_message_event_t ev_state;

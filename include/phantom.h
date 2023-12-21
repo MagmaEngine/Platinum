@@ -170,9 +170,9 @@ struct PDisplayInfo {
 
 void p_x11_window_create(PAppInstance *app_instance, const PWindowRequest window_request);
 void p_x11_window_close(PWindowSettings *window_settings);
-void p_x11_window_fullscreen(PDisplayInfo *display_info);
-void p_x11_window_docked_fullscreen(PDisplayInfo *display_info);
-void p_x11_window_windowed(PDisplayInfo *display_info, uint x, uint y, uint width, uint height);
+void p_x11_window_fullscreen(PWindowSettings *window_settings);
+void p_x11_window_docked_fullscreen(PWindowSettings *window_settings);
+void p_x11_window_windowed(PWindowSettings *window_settings, uint x, uint y, uint width, uint height);
 void p_x11_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height);
 void p_x11_window_set_name(PDisplayInfo *display_info, wchar_t *name);
 EThreadResult p_x11_window_event_manage(EThreadArguments args);
@@ -260,9 +260,9 @@ struct PDisplayInfo{
 
 void p_win32_window_create(PAppInstance *app_instance, const PWindowRequest window_request);
 void p_win32_window_close(PWindowSettings *window_settings);
-void p_win32_window_fullscreen(PDisplayInfo *display_info);
-void p_win32_window_docked_fullscreen(PDisplayInfo *display_info);
-void p_win32_window_windowed(PDisplayInfo *display_info, uint x, uint y, uint width, uint height);
+void p_win32_window_fullscreen(PWindowSettings *window_settings);
+void p_win32_window_docked_fullscreen(PWindowSettings *window_settings);
+void p_win32_window_windowed(PWindowSettings *window_settings, uint x, uint y, uint width, uint height);
 void p_win32_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height);
 void p_win32_window_set_name(PDisplayInfo *display_info, wchar_t *name);
 EThreadResult p_win32_window_event_manage(EThreadArguments args);
