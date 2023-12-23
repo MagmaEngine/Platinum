@@ -265,7 +265,7 @@ void p_win32_window_docked_fullscreen(PWindowSettings *window_settings);
 void p_win32_window_windowed(PWindowSettings *window_settings, uint x, uint y, uint width, uint height);
 void p_win32_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height);
 void p_win32_window_set_name(PDisplayInfo *display_info, wchar_t *name);
-EThreadResult p_win32_window_event_manage(EThreadArguments args);
+EThreadResult WINAPI p_win32_window_event_manage(EThreadArguments args);
 
 
 #endif // _PHANTOM_WIN32

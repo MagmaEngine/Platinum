@@ -58,6 +58,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		case WM_SIZE:
 		case WM_EXITSIZEMOVE:
 		{
+			printf("move triggered.\n");
 			PWindowSettings *window_settings = *(PWindowSettings **)&((char *)window_data)[sizeof (PAppInstance **)];
 			RECT windowRect;
 			GetWindowRect(hwnd, &windowRect);
@@ -95,7 +96,11 @@ void p_win32_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, u
  */
 void p_win32_window_set_name(PDisplayInfo *display_info, wchar_t *name)
 {
-	SetWindowTextW(display_info->hwnd, name);
+	size_t utf8_size = wcstombs(NULL, name, 0);
+	char *utf8_name = malloc(utf8_size + 1);
+	wcstombs(utf8_name, name, utf8_size);
+	utf8_name[utf8_size] = '\0';
+	SetWindowText(display_info->hwnd, utf8_name);
 }
 
 /**
@@ -107,7 +112,7 @@ void p_win32_window_set_name(PDisplayInfo *display_info, wchar_t *name)
 void p_win32_window_create(PAppInstance *app_instance, const PWindowRequest window_request)
 {
 	PDisplayInfo *display_info = malloc(sizeof *display_info);
-	display_info->hInstance = GetModuleHandleW(NULL);
+	display_info->hInstance = GetModuleHandle(NULL);
 	display_info->screen_width = GetSystemMetrics(SM_CXSCREEN);
 	display_info->screen_height = GetSystemMetrics(SM_CYSCREEN);
 
@@ -126,54 +131,11 @@ void p_win32_window_create(PAppInstance *app_instance, const PWindowRequest wind
 	window_settings->status = P_WINDOW_ALIVE;
 
 	// Register the window class
-	WNDCLASSW windowClass = {0};
+	WNDCLASS windowClass = {0};
 	windowClass.lpfnWndProc = WindowProc;
 	windowClass.hInstance = display_info->hInstance;
-	windowClass.lpszClassName = L"PhantomWindowClass";
-	RegisterClassW(&windowClass);
-
-	display_info->hwnd = CreateWindowExW(
-			0,
-			L"PhantomWindowClass",
-			window_settings->name,
-			WS_OVERLAPPEDWINDOW|WS_VISIBLE,
-			window_settings->x, window_settings->y, window_settings->width, window_settings->height,
-			NULL,	  // Parent window
-			NULL,	  // Menu
-			display_info->hInstance,
-			NULL);	 // Additional application data
-
-	if (display_info->hwnd == NULL) {
-		fprintf(stderr, "PHANTOM: ERROR: Cannot open Display!\n");
-		exit(1);
-	}
-
-	// Set display based on type
-	switch (window_request.display_type)
-	{
-		case P_DISPLAY_WINDOWED:
-			p_window_windowed(window_settings, window_request.x, window_request.y, window_request.width,
-					window_request.height);
-		break;
-
-		case P_DISPLAY_DOCKED_FULLSCREEN:
-			p_window_docked_fullscreen(window_settings);
-		break;
-
-		case P_DISPLAY_FULLSCREEN:
-			p_window_fullscreen(window_settings);
-		break;
-
-		case P_DISPLAY_MAX:
-			fprintf(stderr, "P_DISPLAY_MAX is not a valid window type...\n");
-			exit(1);
-	}
-
-	e_mutex_lock(app_instance->window_mutex);
-	e_dynarr_add(app_instance->window_settings, &window_settings);
-	e_mutex_unlock(app_instance->window_mutex);
-
-	// Display the window
+	windowClass.lpszClassName = "PhantomWindowClass";
+	RegisterClass(&windowClass);
 
 	// Start the window event manager
 	EThreadArguments args = malloc(sizeof (PAppInstance *) + sizeof (PWindowSettings *));
@@ -229,18 +191,64 @@ void _win32_window_close(PAppInstance *app_instance, PWindowSettings *window_set
 /**
  * p_win32_window_event_manage
  *
+ * Windows Specific: actually creates the window because windows is stupid.
  * This function runs in its own thread and manages window manager events
  * returns 0
  */
-EThreadResult p_win32_window_event_manage(EThreadArguments args)
+EThreadResult WINAPI p_win32_window_event_manage(EThreadArguments args)
 {
+	PAppInstance *app_instance = ((PAppInstance **)args)[0];
 	PWindowSettings *window_settings = *(PWindowSettings **)&((char *)args)[sizeof (PAppInstance **)];
+	window_settings->display_info->hwnd = CreateWindowEx(
+			0,
+			"PhantomWindowClass",
+			"",
+			WS_OVERLAPPEDWINDOW|WS_VISIBLE,
+			window_settings->x, window_settings->y, window_settings->width, window_settings->height,
+			NULL,	  // Parent window
+			NULL,	  // Menu
+			window_settings->display_info->hInstance,
+			NULL);	 // Additional application data
+
+	if (window_settings->display_info->hwnd == NULL) {
+		fprintf(stderr, "PHANTOM: ERROR: Cannot open Display!\n");
+		exit(1);
+	}
+
+	p_window_set_name(window_settings->display_info, window_settings->name);
+
+	// Set display based on type
+	switch (window_settings->display_type)
+	{
+		case P_DISPLAY_WINDOWED:
+			p_window_windowed(window_settings, window_settings->x, window_settings->y, window_settings->width,
+					window_settings->height);
+		break;
+
+		case P_DISPLAY_DOCKED_FULLSCREEN:
+			p_window_docked_fullscreen(window_settings);
+		break;
+
+		case P_DISPLAY_FULLSCREEN:
+			p_window_fullscreen(window_settings);
+		break;
+
+		case P_DISPLAY_MAX:
+			fprintf(stderr, "P_DISPLAY_MAX is not a valid window type...\n");
+			exit(1);
+	}
+
+	e_mutex_lock(app_instance->window_mutex);
+	e_dynarr_add(app_instance->window_settings, &window_settings);
+	e_mutex_unlock(app_instance->window_mutex);
 
 	MSG msg = {0};
 
 	// Run the message loop
+	printf("Test1\n");
 	while (GetMessage(&msg, NULL, 0, 0))
 	{
+		printf("Test2\n");
 		TranslateMessage(&msg);
 		DispatchMessage(&msg);
 	}
