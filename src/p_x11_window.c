@@ -285,9 +285,10 @@ EThreadResult p_x11_window_event_manage(EThreadArguments args)
 			case XCB_EXPOSE:
 			{
 				xcb_expose_event_t *expose_event = (xcb_expose_event_t *)event;
+				E_UNUSED(expose_event);
 				// TODO: redraw (only new part?)
 				if (event_calls->enable_expose && event_calls->expose != NULL)
-					event_calls->expose(expose_event);
+					event_calls->expose();
 				break;
 			}
 			case XCB_CONFIGURE_NOTIFY:
@@ -298,12 +299,13 @@ EThreadResult p_x11_window_event_manage(EThreadArguments args)
 				window_settings->width = config_notify_event->width;
 				window_settings->height = config_notify_event->height;
 				if (event_calls->enable_configure && event_calls->configure != NULL)
-					event_calls->configure(config_notify_event);
+					event_calls->configure();
 				break;
 			}
 			case XCB_PROPERTY_NOTIFY:
 			{
 				xcb_property_notify_event_t *property_notify_event = (xcb_property_notify_event_t *)event;
+				E_UNUSED(property_notify_event);
 
 				xcb_get_property_cookie_t property_cookie_state = xcb_get_property(display_info->connection, 0,
 						display_info->window, display_info->atoms[P_ATOM_NET_WM_STATE], XCB_ATOM_ANY, 0, 1024);
@@ -347,67 +349,57 @@ EThreadResult p_x11_window_event_manage(EThreadArguments args)
 				}
 
 				if (event_calls->enable_property && event_calls->property != NULL)
-					event_calls->property(property_notify_event);
+					event_calls->property();
 				break;
 			}
 			case XCB_CLIENT_MESSAGE:
 			{
 				xcb_client_message_event_t *message_event = (xcb_client_message_event_t *)event;
+				E_UNUSED(message_event);
 				if (event_calls->enable_client && event_calls->client != NULL)
-					event_calls->client(message_event);
+					event_calls->client();
 				break;
 			}
 			case XCB_FOCUS_IN:
 			{
 				xcb_focus_in_event_t *focus_in_event = (xcb_focus_in_event_t *)event;
+				E_UNUSED(focus_in_event);
 				if (event_calls->enable_focus_in && event_calls->focus_in != NULL)
-					event_calls->focus_in(focus_in_event);
+					event_calls->focus_in();
 				break;
 			}
 			case XCB_FOCUS_OUT:
 			{
 				xcb_focus_out_event_t *focus_out_event = (xcb_focus_out_event_t *)event;
+				E_UNUSED(focus_out_event);
 				if (event_calls->enable_focus_out && event_calls->focus_out != NULL)
-					event_calls->focus_out(focus_out_event);
+					event_calls->focus_out();
 				break;
 			}
 			case XCB_ENTER_NOTIFY:
 			{
 				xcb_enter_notify_event_t *enter_notify_event = (xcb_enter_notify_event_t *)event;
+				E_UNUSED(enter_notify_event);
 				if (event_calls->enable_enter && event_calls->enter != NULL)
-					event_calls->enter(enter_notify_event);
+					event_calls->enter();
 				break;
 			}
 			case XCB_LEAVE_NOTIFY:
 			{
 				xcb_leave_notify_event_t *leave_notify_event = (xcb_leave_notify_event_t *)event;
+				E_UNUSED(leave_notify_event);
 				if (event_calls->enable_leave && event_calls->leave != NULL)
-					event_calls->leave(leave_notify_event);
-				break;
-			}
-			case XCB_MAP_NOTIFY:
-			{
-				xcb_map_notify_event_t *map_notify_event = (xcb_map_notify_event_t *)event;
-				// TODO: mimimize/maximize? tell engine to go active?
-				if (event_calls->enable_map && event_calls->map != NULL)
-					event_calls->map(map_notify_event);
-				break;
-			}
-			case XCB_UNMAP_NOTIFY:
-			{
-				xcb_unmap_notify_event_t *unmap_notify_event = (xcb_unmap_notify_event_t *)event;
-				// TODO: mimimize/maximize? tell engine to go dormant?
-				if (event_calls->enable_unmap && event_calls->unmap != NULL)
-					event_calls->unmap(unmap_notify_event);
+					event_calls->leave();
 				break;
 			}
 			case XCB_DESTROY_NOTIFY:
 			{
 				xcb_destroy_notify_event_t *destroy_notify_event = (xcb_destroy_notify_event_t *)event;
+				E_UNUSED(destroy_notify_event);
 				// TODO: handle errors
 
 				if (event_calls->enable_destroy && event_calls->destroy != NULL)
-					event_calls->destroy(destroy_notify_event);
+					event_calls->destroy();
 
 				e_mutex_lock(app_instance->window_mutex);
 				if (window_settings->status == P_WINDOW_ALIVE)

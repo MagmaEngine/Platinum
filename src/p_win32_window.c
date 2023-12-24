@@ -2,7 +2,9 @@
 #include <windows.h>
 #include <stdio.h>
 
-HBRUSH hBrush;
+static HANDLE window_creation_event;
+static HBRUSH hBrush;
+
 void _win32_window_close(PAppInstance *app_instance, PWindowSettings *window_settingsi);
 
 /**
@@ -16,22 +18,31 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 	switch (uMsg)
 	{
-		case WM_DESTROY:
-			DeleteObject(hBrush);
-			PostQuitMessage(0);
-			PAppInstance *app_instance = ((PAppInstance **)window_data)[0];
+		// Expose events
+		case WM_UPDATEUISTATE:
+			printf("Update UI State triggered.\n");
+		case WM_NCPAINT:
+			printf("NC Paint triggered.\n");
+		case WM_PRINTCLIENT:
+			printf("Print Client triggered.\n");
+		{
 			PWindowSettings *window_settings = *(PWindowSettings **)&((char *)window_data)[sizeof (PAppInstance **)];
-			e_mutex_lock(app_instance->window_mutex);
-			if (window_settings->status == P_WINDOW_ALIVE)
-				window_settings->status = P_WINDOW_CLOSE;
-			e_mutex_unlock(app_instance->window_mutex);
-			_win32_window_close(app_instance, window_settings);
+			if (window_settings->event_calls->enable_expose && window_settings->event_calls->expose != NULL)
+				window_settings->event_calls->expose();
 			return 0;
+		}
 		case WM_ERASEBKGND:
+		{
+			printf("Erase Background triggered.\n");
+			PWindowSettings *window_settings = *(PWindowSettings **)&((char *)window_data)[sizeof (PAppInstance **)];
+			if (window_settings->event_calls->enable_expose && window_settings->event_calls->expose != NULL)
+				window_settings->event_calls->expose();
 			// Handle erase background message to avoid flickering
 			return 1;
+		}
 		case WM_PAINT:
 		{
+			printf("Paint triggered.\n");
 			PAINTSTRUCT ps;
 			HDC hdc = BeginPaint(hwnd, &ps);
 
@@ -46,33 +57,123 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			// Fill the background with the black brush
 			FillRect(hdc, &ps.rcPaint, hBrush);
 			EndPaint(hwnd, &ps);
+			PWindowSettings *window_settings = *(PWindowSettings **)&((char *)window_data)[sizeof (PAppInstance **)];
+			if (window_settings->event_calls->enable_expose && window_settings->event_calls->expose != NULL)
+				window_settings->event_calls->expose();
 			return 0;
 		}
+
+		// Configure events
 		case WM_DISPLAYCHANGE:
 		{
+			printf("Display Change triggered.\n");
 			PWindowSettings *window_settings = *(PWindowSettings **)&((char *)window_data)[sizeof (PAppInstance **)];
 			window_settings->display_info->screen_width = GetSystemMetrics(SM_CXSCREEN);
 			window_settings->display_info->screen_height = GetSystemMetrics(SM_CYSCREEN);
+			if (window_settings->event_calls->enable_configure && window_settings->event_calls->configure != NULL)
+				window_settings->event_calls->configure();
 			return 0;
 		}
 		case WM_SIZE:
+		{
+			printf("Size triggered.\n");
+			PWindowSettings *window_settings = *(PWindowSettings **)&((char *)window_data)[sizeof (PAppInstance **)];
+			if (window_settings->event_calls->enable_configure && window_settings->event_calls->configure != NULL)
+				window_settings->event_calls->configure();
+			window_settings->width = LOWORD(lParam);
+			window_settings->height = HIWORD(lParam);
+			fprintf(stderr, "Resize: %i, %i, %i, %i\n", window_settings->x, window_settings->y, window_settings->width, window_settings->height);
+			return 0;
+		}
 		case WM_EXITSIZEMOVE:
 		{
-			printf("move triggered.\n");
+			printf("Move triggered.\n");
 			PWindowSettings *window_settings = *(PWindowSettings **)&((char *)window_data)[sizeof (PAppInstance **)];
 			RECT windowRect;
 			GetWindowRect(hwnd, &windowRect);
 
 			window_settings->x = windowRect.left;
 			window_settings->y = windowRect.top;
-			window_settings->width = LOWORD(lParam);
-			window_settings->height = HIWORD(lParam);
 
 			InvalidateRect(hwnd, NULL, TRUE);
 
-			printf("Resize: %i, %i, %i, %i\n", window_settings->x, window_settings->y, window_settings->width, window_settings->height);
+			if (window_settings->event_calls->enable_configure && window_settings->event_calls->configure != NULL)
+				window_settings->event_calls->configure();
+
+			fprintf(stderr, "Resize: %i, %i, %i, %i\n", window_settings->x, window_settings->y, window_settings->width, window_settings->height);
 			return 0;
 		}
+
+		// Client message events
+		case WM_COPYDATA:
+		{
+			printf("Copy Data triggered.\n");
+			PWindowSettings *window_settings = *(PWindowSettings **)&((char *)window_data)[sizeof (PAppInstance **)];
+			if (window_settings->event_calls->enable_client && window_settings->event_calls->client != NULL)
+				window_settings->event_calls->client();
+			return 0;
+		}
+
+		// Focus in events
+		case WM_SETFOCUS:
+		{
+			printf("Set Focus triggered.\n");
+			PWindowSettings *window_settings = *(PWindowSettings **)&((char *)window_data)[sizeof (PAppInstance **)];
+			if (window_settings->event_calls->enable_focus_in && window_settings->event_calls->focus_in != NULL)
+				window_settings->event_calls->focus_in();
+			return 0;
+		}
+
+		// Focus out events
+		case WM_KILLFOCUS:
+		{
+			printf("Kill Focus triggered.\n");
+			PWindowSettings *window_settings = *(PWindowSettings **)&((char *)window_data)[sizeof (PAppInstance **)];
+			if (window_settings->event_calls->enable_focus_out && window_settings->event_calls->focus_out != NULL)
+				window_settings->event_calls->focus_out();
+			return 0;
+		}
+
+		// Enter events
+		case WM_MOUSEMOVE:
+		{
+			printf("Mouse Move triggered.\n");
+			// TODO: make the event only trigger on mouse enter
+			PWindowSettings *window_settings = *(PWindowSettings **)&((char *)window_data)[sizeof (PAppInstance **)];
+			if (window_settings->event_calls->enable_enter && window_settings->event_calls->enter != NULL)
+				window_settings->event_calls->enter();
+			return 0;
+		}
+
+		// Leave events
+		case WM_MOUSELEAVE:
+		{
+			printf("Mouse Leave triggered.\n");
+			// TODO: make the event only trigger on mouse enter
+			PWindowSettings *window_settings = *(PWindowSettings **)&((char *)window_data)[sizeof (PAppInstance **)];
+			if (window_settings->event_calls->enable_leave && window_settings->event_calls->leave != NULL)
+				window_settings->event_calls->leave();
+			return 0;
+		}
+
+		// Destroy events
+		case WM_DESTROY:
+		{
+			printf("Destroy triggered.\n");
+			DeleteObject(hBrush);
+			PAppInstance *app_instance = ((PAppInstance **)window_data)[0];
+			PWindowSettings *window_settings = *(PWindowSettings **)&((char *)window_data)[sizeof (PAppInstance **)];
+			if (window_settings->event_calls->enable_destroy && window_settings->event_calls->destroy != NULL)
+				window_settings->event_calls->destroy();
+			PostQuitMessage(0);
+			e_mutex_lock(app_instance->window_mutex);
+			if (window_settings->status == P_WINDOW_ALIVE)
+				window_settings->status = P_WINDOW_CLOSE;
+			e_mutex_unlock(app_instance->window_mutex);
+			_win32_window_close(app_instance, window_settings);
+			return 0;
+		}
+
 		default:
 			return DefWindowProc(hwnd, uMsg, wParam, lParam);
 	}
@@ -137,13 +238,21 @@ void p_win32_window_create(PAppInstance *app_instance, const PWindowRequest wind
 	windowClass.lpszClassName = "PhantomWindowClass";
 	RegisterClass(&windowClass);
 
+	window_creation_event = CreateEvent(NULL, FALSE, FALSE, NULL);
+
 	// Start the window event manager
 	EThreadArguments args = malloc(sizeof (PAppInstance *) + sizeof (PWindowSettings *));
 	memcpy(args, &app_instance, sizeof (PAppInstance **));
 	memcpy(&((char *)args)[sizeof (PAppInstance **)], &window_settings, sizeof (PWindowSettings **));
 	window_settings->event_manager = e_thread_create(p_window_event_manage, args);
 
-	SetWindowLongPtr(display_info->hwnd, GWLP_USERDATA, (LONG_PTR)args);
+	DWORD result = WaitForSingleObject(window_creation_event, INFINITE);
+	if (result != WAIT_OBJECT_0)
+	{
+		fprintf(stderr, "Error waiting for window creation.\n");
+		exit(1);
+	}
+	CloseHandle(window_creation_event);
 }
 
 /**
@@ -242,13 +351,14 @@ EThreadResult WINAPI p_win32_window_event_manage(EThreadArguments args)
 	e_dynarr_add(app_instance->window_settings, &window_settings);
 	e_mutex_unlock(app_instance->window_mutex);
 
+	SetWindowLongPtr(window_settings->display_info->hwnd, GWLP_USERDATA, (LONG_PTR)args);
+	SetEvent(window_creation_event);
+
 	MSG msg = {0};
 
 	// Run the message loop
-	printf("Test1\n");
 	while (GetMessage(&msg, NULL, 0, 0))
 	{
-		printf("Test2\n");
 		TranslateMessage(&msg);
 		DispatchMessage(&msg);
 	}

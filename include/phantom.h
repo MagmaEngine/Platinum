@@ -34,7 +34,6 @@ typedef struct PDisplayInfo PDisplayInfo;
 typedef struct PEventCalls PEventCalls;
 typedef struct PWindowRequest PWindowRequest;
 typedef struct PWindowSettings PWindowSettings;
-typedef void * PEventArguments;
 
 /**
  * PEventCalls
@@ -50,20 +49,16 @@ struct PEventCalls {
 	bool enable_focus_out;
 	bool enable_enter;
 	bool enable_leave;
-	bool enable_map;
-	bool enable_unmap;
 	bool enable_destroy;
-	void (*expose)(PEventArguments);
-	void (*configure)(PEventArguments);
-	void (*property)(PEventArguments);
-	void (*client)(PEventArguments);
-	void (*focus_in)(PEventArguments);
-	void (*focus_out)(PEventArguments);
-	void (*enter)(PEventArguments);
-	void (*leave)(PEventArguments);
-	void (*map)(PEventArguments);
-	void (*unmap)(PEventArguments);
-	void (*destroy)(PEventArguments);
+	void (*expose)(void);
+	void (*configure)(void);
+	void (*property)(void);
+	void (*client)(void);
+	void (*focus_in)(void);
+	void (*focus_out)(void);
+	void (*enter)(void);
+	void (*leave)(void);
+	void (*destroy)(void);
 };
 
 /**
