@@ -1,5 +1,6 @@
 #include "phantom.h"
 #include <locale.h>
+#include <stdio.h>
 
 /**
  * p_windows_app_init
@@ -9,8 +10,12 @@
  */
 PAppInstance *p_windows_app_init(void)
 {
-	// TODO: Set locale to same as system
 	setlocale(LC_ALL, "");
+
+	// Makes a console
+	AllocConsole();
+	freopen("CONOUT$", "w", stdout);
+	freopen("CONOUT$", "w", stderr);
 
 	PAppInstance *app_instance = malloc(sizeof *app_instance);
 
@@ -43,10 +48,10 @@ void p_windows_app_deinit(PAppInstance *app_instance)
 		e_dynarr_remove_unordered(app_instance->window_settings, index);
 	}
 	e_dynarr_deinit(app_instance->window_settings);
-	//free(window_settings);
 
 	//p_event_deinit(app_instance->input_manager);
 	e_mutex_destroy(app_instance->window_mutex);
 	free(app_instance->window_mutex);
 	free(app_instance);
+	//FreeConsole(); // Closes the log console. Also ends the application
 }

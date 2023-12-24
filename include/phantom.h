@@ -169,7 +169,7 @@ void p_x11_window_fullscreen(PWindowSettings *window_settings);
 void p_x11_window_docked_fullscreen(PWindowSettings *window_settings);
 void p_x11_window_windowed(PWindowSettings *window_settings, uint x, uint y, uint width, uint height);
 void p_x11_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height);
-void p_x11_window_set_name(PDisplayInfo *display_info, wchar_t *name);
+void p_x11_window_set_name(PDisplayInfo *display_info, const wchar_t *name);
 EThreadResult p_x11_window_event_manage(EThreadArguments args);
 
 #endif
@@ -239,6 +239,7 @@ void p_linux_event_deinit(PDeviceManager *input_manager);
 struct PDisplayInfo{
 	HWND hwnd;
 	HINSTANCE hInstance;
+	HBRUSH hBrush;
 	uint screen_width;
 	uint screen_height;
 };
@@ -259,7 +260,7 @@ void p_win32_window_fullscreen(PWindowSettings *window_settings);
 void p_win32_window_docked_fullscreen(PWindowSettings *window_settings);
 void p_win32_window_windowed(PWindowSettings *window_settings, uint x, uint y, uint width, uint height);
 void p_win32_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height);
-void p_win32_window_set_name(PDisplayInfo *display_info, wchar_t *name);
+void p_win32_window_set_name(PDisplayInfo *display_info, const wchar_t *name);
 EThreadResult WINAPI p_win32_window_event_manage(EThreadArguments args);
 
 

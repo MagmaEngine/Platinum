@@ -46,7 +46,7 @@ void p_x11_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uin
  *
  * sets the name of the window
  */
-void p_x11_window_set_name(PDisplayInfo *display_info, wchar_t *name)
+void p_x11_window_set_name(PDisplayInfo *display_info, const wchar_t *name)
 {
 	// convert name to char*
 	size_t utf8_size = wcstombs(NULL, name, 0);
