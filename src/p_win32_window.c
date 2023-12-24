@@ -177,7 +177,7 @@ void p_win32_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, u
  */
 void p_win32_window_set_name(PDisplayInfo *display_info, const wchar_t *name)
 {
-	SetWindowTextW(display_info->hwnd, name);
+	SetWindowText(display_info->hwnd, name);
 }
 
 /**
@@ -193,6 +193,7 @@ void p_win32_window_create(PAppInstance *app_instance, const PWindowRequest wind
 	display_info->screen_width = GetSystemMetrics(SM_CXSCREEN);
 	display_info->screen_height = GetSystemMetrics(SM_CYSCREEN);
 	display_info->hBrush = CreateSolidBrush(RGB(0, 0, 0));
+	display_info->class_name = L"PhantomWindowClass";
 
 	PWindowSettings *window_settings = malloc(sizeof *window_settings);
 	window_settings->name = malloc((wcslen(window_request.name)+1) * sizeof(wchar_t));
@@ -209,11 +210,11 @@ void p_win32_window_create(PAppInstance *app_instance, const PWindowRequest wind
 	window_settings->status = P_WINDOW_ALIVE;
 
 	// Register the window class
-	WNDCLASSW window_class = {0};
+	WNDCLASS window_class = {0};
 	window_class.lpfnWndProc = WindowProc;
 	window_class.hInstance = display_info->hInstance;
-	window_class.lpszClassName = L"PhantomWindowClass";
-	if (!RegisterClassW(&window_class))
+	window_class.lpszClassName = display_info->class_name;
+	if (!RegisterClass(&window_class))
 	{
 		fprintf(stderr, "Window registration failed...\n");
 		exit(1);
@@ -290,9 +291,9 @@ EThreadResult WINAPI p_win32_window_event_manage(EThreadArguments args)
 {
 	PAppInstance *app_instance = ((PAppInstance **)args)[0];
 	PWindowSettings *window_settings = *(PWindowSettings **)&((char *)args)[sizeof (PAppInstance **)];
-	window_settings->display_info->hwnd = CreateWindowExW(
+	window_settings->display_info->hwnd = CreateWindowEx(
 			0,
-			L"PhantomWindowClass",
+			window_settings->display_info->class_name,
 			window_settings->name,
 			WS_OVERLAPPEDWINDOW|WS_VISIBLE,
 			window_settings->x, window_settings->y, window_settings->width, window_settings->height,

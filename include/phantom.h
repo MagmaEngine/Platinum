@@ -240,6 +240,7 @@ struct PDisplayInfo{
 	HWND hwnd;
 	HINSTANCE hInstance;
 	HBRUSH hBrush;
+	wchar_t *class_name;
 	uint screen_width;
 	uint screen_height;
 };
