@@ -30,7 +30,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		// Expose events
 		case WM_ERASEBKGND:
 		{
-			printf("Erase Background triggered.\n");
+			e_log_message(E_LOG_DEBUG, L"Phantom", L"Erase Background Event triggered.");
 			if (window_settings->event_calls->enable_expose && window_settings->event_calls->expose != NULL)
 				window_settings->event_calls->expose();
 			// Handle erase background message to avoid flickering
@@ -38,7 +38,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		}
 		case WM_PAINT:
 		{
-			printf("Paint triggered.\n");
+			e_log_message(E_LOG_DEBUG, L"Phantom", L"Paint Event triggered.");
 			PAINTSTRUCT ps;
 			HDC hdc = BeginPaint(hwnd, &ps);
 
@@ -56,7 +56,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		// Configure events
 		case WM_DISPLAYCHANGE:
 		{
-			printf("Display Change triggered.\n");
+			e_log_message(E_LOG_DEBUG, L"Phantom", L"Display Change Event triggered.");
 			window_settings->display_info->screen_width = GetSystemMetrics(SM_CXSCREEN);
 			window_settings->display_info->screen_height = GetSystemMetrics(SM_CYSCREEN);
 			if (window_settings->event_calls->enable_configure && window_settings->event_calls->configure != NULL)
@@ -65,18 +65,17 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		}
 		case WM_SIZE:
 		{
-			printf("Size triggered.\n");
+			e_log_message(E_LOG_DEBUG, L"Phantom", L"Size Event triggered.");
 			window_settings->width = LOWORD(lParam);
 			window_settings->height = HIWORD(lParam);
 			if (window_settings->event_calls->enable_configure && window_settings->event_calls->configure != NULL)
 				window_settings->event_calls->configure();
 			InvalidateRect(hwnd, NULL, TRUE);
-			fprintf(stderr, "Resize: %i, %i, %i, %i\n", window_settings->x, window_settings->y, window_settings->width, window_settings->height);
 			return 0;
 		}
 		case WM_EXITSIZEMOVE:
 		{
-			printf("Move triggered.\n");
+			e_log_message(E_LOG_DEBUG, L"Phantom", L"Exit Size Move Event triggered.");
 			RECT windowRect;
 			GetWindowRect(hwnd, &windowRect);
 
@@ -87,15 +86,13 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 			if (window_settings->event_calls->enable_configure && window_settings->event_calls->configure != NULL)
 				window_settings->event_calls->configure();
-
-			fprintf(stderr, "Resize: %i, %i, %i, %i\n", window_settings->x, window_settings->y, window_settings->width, window_settings->height);
 			return 0;
 		}
 
 		// Client message events
 		case WM_COPYDATA:
 		{
-			printf("Copy Data triggered.\n");
+			e_log_message(E_LOG_DEBUG, L"Phantom", L"Copy Data Event triggered.");
 			if (window_settings->event_calls->enable_client && window_settings->event_calls->client != NULL)
 				window_settings->event_calls->client();
 			return 0;
@@ -104,7 +101,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		// Focus in events
 		case WM_SETFOCUS:
 		{
-			printf("Set Focus triggered.\n");
+			e_log_message(E_LOG_DEBUG, L"Phantom", L"Set Focus Event triggered.");
 			if (window_settings->event_calls->enable_focus_in && window_settings->event_calls->focus_in != NULL)
 				window_settings->event_calls->focus_in();
 			return 0;
@@ -113,7 +110,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		// Focus out events
 		case WM_KILLFOCUS:
 		{
-			printf("Kill Focus triggered.\n");
+			e_log_message(E_LOG_DEBUG, L"Phantom", L"Kill Focus Event triggered.");
 			if (window_settings->event_calls->enable_focus_out && window_settings->event_calls->focus_out != NULL)
 				window_settings->event_calls->focus_out();
 			return 0;
@@ -122,7 +119,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		// Enter events
 		case WM_MOUSEMOVE:
 		{
-			printf("Mouse Move triggered.\n");
+			e_log_message(E_LOG_DEBUG, L"Phantom", L"Mouse Move Event triggered.");
 			// TODO: make the event only trigger on mouse enter
 			if (window_settings->event_calls->enable_enter && window_settings->event_calls->enter != NULL)
 				window_settings->event_calls->enter();
@@ -132,7 +129,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		// Leave events
 		case WM_MOUSELEAVE:
 		{
-			printf("Mouse Leave triggered.\n");
+			e_log_message(E_LOG_DEBUG, L"Phantom", L"Mouse Leave Event triggered.");
 			if (window_settings->event_calls->enable_leave && window_settings->event_calls->leave != NULL)
 				window_settings->event_calls->leave();
 			return 0;
@@ -141,7 +138,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		// Destroy events
 		case WM_DESTROY:
 		{
-			printf("Destroy triggered.\n");
+			e_log_message(E_LOG_DEBUG, L"Phantom", L"Destroy Event triggered.");
 			DeleteObject(window_settings->display_info->hBrush);
 			if (window_settings->event_calls->enable_destroy && window_settings->event_calls->destroy != NULL)
 				window_settings->event_calls->destroy();
@@ -155,6 +152,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		}
 
 		default:
+			e_log_message(E_LOG_DEBUG, L"Phantom", L"Unknown Event triggered.");
 			return DefWindowProc(hwnd, uMsg, wParam, lParam);
 	}
 }
@@ -216,7 +214,7 @@ void p_win32_window_create(PAppInstance *app_instance, const PWindowRequest wind
 	window_class.lpszClassName = display_info->class_name;
 	if (!RegisterClass(&window_class))
 	{
-		fprintf(stderr, "Window registration failed...\n");
+		e_log_message(E_LOG_ERROR, L"Phantom", L"Window registration failed...");
 		exit(1);
 	}
 
@@ -231,7 +229,7 @@ void p_win32_window_create(PAppInstance *app_instance, const PWindowRequest wind
 	DWORD result = WaitForSingleObject(window_creation_event, INFINITE);
 	if (result != WAIT_OBJECT_0)
 	{
-		fprintf(stderr, "Error waiting for window creation.\n");
+		e_log_message(E_LOG_ERROR, L"Phantom", L"Error waiting for window creation.");
 		exit(1);
 	}
 	CloseHandle(window_creation_event);
@@ -265,7 +263,7 @@ void _win32_window_close(PAppInstance *app_instance, PWindowSettings *window_set
 	int index = e_dynarr_contains(app_instance->window_settings, &window_settings);
 	if (index == -1)
 	{
-		fprintf(stderr, "Window does not exist...\n");
+		e_log_message(E_LOG_ERROR, L"Phantom", L"Window does not exist...");
 		exit(1);
 	}
 	free(window_settings->display_info);
@@ -303,7 +301,7 @@ EThreadResult WINAPI p_win32_window_event_manage(EThreadArguments args)
 			NULL);	 // Additional application data
 
 	if (window_settings->display_info->hwnd == NULL) {
-		fprintf(stderr, "PHANTOM: ERROR: Cannot open Display!\n");
+		e_log_message(E_LOG_ERROR, L"Phantom", L"Cannot open window");
 		exit(1);
 	}
 
@@ -324,7 +322,7 @@ EThreadResult WINAPI p_win32_window_event_manage(EThreadArguments args)
 		break;
 
 		case P_DISPLAY_MAX:
-			fprintf(stderr, "P_DISPLAY_MAX is not a valid window type...\n");
+			e_log_message(E_LOG_WARNING, L"Phantom", L"P_DISPLAY_MAX is not a valid window type");
 			exit(1);
 	}
 

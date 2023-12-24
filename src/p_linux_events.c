@@ -17,7 +17,7 @@ PDeviceManager *p_linux_event_init(void)
 {
 	udev = udev_new();
 	if (!udev) {
-		fprintf(stderr, "Failed to initialize udev\n");
+		e_log_message(E_LOG_ERROR, L"Phantom", L"Failed to initialize udev");
 		exit(EXIT_FAILURE);
 	}
 	PDeviceManager *input_manager = malloc(sizeof * input_manager);

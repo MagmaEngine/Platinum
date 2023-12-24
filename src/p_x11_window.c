@@ -1,5 +1,5 @@
 #include "phantom.h"
-#include "enigma.h"
+#include <enigma.h>
 #include <threads.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -18,7 +18,7 @@ xcb_atom_t p_x11_generate_atom(xcb_connection_t *connection, const char *atom_na
 	xcb_intern_atom_cookie_t cookie = xcb_intern_atom(connection, 0, strlen(atom_name), atom_name);
 	xcb_intern_atom_reply_t *reply = xcb_intern_atom_reply(connection, cookie, NULL);
 	if (!reply) {
-		fprintf(stderr, "Could not get atom reply...");
+		e_log_message(E_LOG_ERROR, L"Phantom", L"Could not get atom reply...");
 		exit(1);
 	}
 	xcb_atom_t atom = reply->atom;
@@ -87,7 +87,7 @@ void p_x11_window_create(PAppInstance *app_instance, const PWindowRequest window
 	// Check if the connection was successful
 	if (xcb_connection_has_error(connection))
 	{
-		fprintf(stderr, "Unable to open the connection to the X server\n");
+		e_log_message(E_LOG_ERROR, L"Phantom", L"Unable to open the connection to the X server");
 		exit(1);
 	}
 
@@ -122,7 +122,7 @@ void p_x11_window_create(PAppInstance *app_instance, const PWindowRequest window
 	{
 		if (display_info->atoms[i] == XCB_ATOM_NONE)
 		{
-			fprintf(stderr, "XCB atoms not initialized. Aborting...\n");
+			e_log_message(E_LOG_ERROR, L"Phantom", L"XCB atoms not initialized. Aborting...");
 			exit(1);
 		}
 	}
@@ -193,7 +193,7 @@ void p_x11_window_create(PAppInstance *app_instance, const PWindowRequest window
 		break;
 
 		case P_DISPLAY_MAX:
-			fprintf(stderr, "P_DISPLAY_MAX is not a valid window type...\n");
+			e_log_message(E_LOG_WARNING, L"Phantom", L"P_DISPLAY_MAX is not a valid window type...");
 			exit(1);
 	}
 
@@ -233,7 +233,7 @@ void _x11_window_close(PAppInstance *app_instance, PWindowSettings *window_setti
 	int index = e_dynarr_contains(app_instance->window_settings, &window_settings);
 	if (index == -1)
 	{
-		fprintf(stderr, "Window does not exist...\n");
+		e_log_message(E_LOG_ERROR, L"Phantom", L"Window does not exist...");
 		exit(1);
 	}
 	PDisplayInfo *display_info = window_settings->display_info;
@@ -271,7 +271,7 @@ EThreadResult p_x11_window_event_manage(EThreadArguments args)
 		xcb_generic_event_t *event = xcb_wait_for_event(display_info->connection);
 		if (!event)
 		{
-			fprintf(stdout, "PHANTOM: Warn: Event was null...\n");
+			e_log_message(E_LOG_WARNING, L"Phantom", L"Event was null...");
 			e_mutex_lock(app_instance->window_mutex);
 			if (window_settings->status == P_WINDOW_ALIVE)
 				window_settings->status = P_WINDOW_CLOSE;
@@ -284,6 +284,7 @@ EThreadResult p_x11_window_event_manage(EThreadArguments args)
 			// TODO: experiment with capturing mouse and keyboard
 			case XCB_EXPOSE:
 			{
+				e_log_message(E_LOG_DEBUG, L"Phantom", L"Expose Event triggered");
 				xcb_expose_event_t *expose_event = (xcb_expose_event_t *)event;
 				E_UNUSED(expose_event);
 				// TODO: redraw (only new part?)
@@ -293,6 +294,7 @@ EThreadResult p_x11_window_event_manage(EThreadArguments args)
 			}
 			case XCB_CONFIGURE_NOTIFY:
 			{
+				e_log_message(E_LOG_DEBUG, L"Phantom", L"Configure Notify Event triggered");
 				xcb_configure_notify_event_t *config_notify_event = (xcb_configure_notify_event_t *)event;
 				window_settings->x = config_notify_event->x;
 				window_settings->y = config_notify_event->y;
@@ -304,6 +306,7 @@ EThreadResult p_x11_window_event_manage(EThreadArguments args)
 			}
 			case XCB_PROPERTY_NOTIFY:
 			{
+				e_log_message(E_LOG_DEBUG, L"Phantom", L"Property Notify Event triggered");
 				xcb_property_notify_event_t *property_notify_event = (xcb_property_notify_event_t *)event;
 				E_UNUSED(property_notify_event);
 
@@ -354,6 +357,7 @@ EThreadResult p_x11_window_event_manage(EThreadArguments args)
 			}
 			case XCB_CLIENT_MESSAGE:
 			{
+				e_log_message(E_LOG_DEBUG, L"Phantom", L"Client Message Event triggered");
 				xcb_client_message_event_t *message_event = (xcb_client_message_event_t *)event;
 				E_UNUSED(message_event);
 				if (event_calls->enable_client && event_calls->client != NULL)
@@ -362,6 +366,7 @@ EThreadResult p_x11_window_event_manage(EThreadArguments args)
 			}
 			case XCB_FOCUS_IN:
 			{
+				e_log_message(E_LOG_DEBUG, L"Phantom", L"Focus In Event triggered");
 				xcb_focus_in_event_t *focus_in_event = (xcb_focus_in_event_t *)event;
 				E_UNUSED(focus_in_event);
 				if (event_calls->enable_focus_in && event_calls->focus_in != NULL)
@@ -370,6 +375,7 @@ EThreadResult p_x11_window_event_manage(EThreadArguments args)
 			}
 			case XCB_FOCUS_OUT:
 			{
+				e_log_message(E_LOG_DEBUG, L"Phantom", L"Focus Out Event triggered");
 				xcb_focus_out_event_t *focus_out_event = (xcb_focus_out_event_t *)event;
 				E_UNUSED(focus_out_event);
 				if (event_calls->enable_focus_out && event_calls->focus_out != NULL)
@@ -378,6 +384,7 @@ EThreadResult p_x11_window_event_manage(EThreadArguments args)
 			}
 			case XCB_ENTER_NOTIFY:
 			{
+				e_log_message(E_LOG_DEBUG, L"Phantom", L"Enter Notify Event triggered");
 				xcb_enter_notify_event_t *enter_notify_event = (xcb_enter_notify_event_t *)event;
 				E_UNUSED(enter_notify_event);
 				if (event_calls->enable_enter && event_calls->enter != NULL)
@@ -386,6 +393,7 @@ EThreadResult p_x11_window_event_manage(EThreadArguments args)
 			}
 			case XCB_LEAVE_NOTIFY:
 			{
+				e_log_message(E_LOG_DEBUG, L"Phantom", L"Leave Notify Event triggered");
 				xcb_leave_notify_event_t *leave_notify_event = (xcb_leave_notify_event_t *)event;
 				E_UNUSED(leave_notify_event);
 				if (event_calls->enable_leave && event_calls->leave != NULL)
@@ -394,6 +402,7 @@ EThreadResult p_x11_window_event_manage(EThreadArguments args)
 			}
 			case XCB_DESTROY_NOTIFY:
 			{
+				e_log_message(E_LOG_DEBUG, L"Phantom", L"Destroy Notify Event triggered");
 				xcb_destroy_notify_event_t *destroy_notify_event = (xcb_destroy_notify_event_t *)event;
 				E_UNUSED(destroy_notify_event);
 				// TODO: handle errors
@@ -407,6 +416,11 @@ EThreadResult p_x11_window_event_manage(EThreadArguments args)
 				e_mutex_unlock(app_instance->window_mutex);
 				_x11_window_close(app_instance, window_settings);
 
+				break;
+			}
+			default:
+			{
+				e_log_message(E_LOG_DEBUG, L"Phantom", L"Unknown Event triggered.");
 				break;
 			}
 		}
