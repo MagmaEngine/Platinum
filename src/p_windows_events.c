@@ -12,6 +12,11 @@ PDeviceManager *p_windows_event_init(void)
 	return NULL;
 }
 
+/**
+ * p_windows_event_deinit
+ *
+ * deinitializes the event manager.
+ */
 void p_windows_event_deinit(PDeviceManager *input_manager)
 {
 }

@@ -1,5 +1,4 @@
 #include "phantom.h"
-#include <stdio.h>
 #include <libudev.h>
 #include <libevdev/libevdev.h>
 #include <libevdev/libevdev-uinput.h>
@@ -25,6 +24,12 @@ PDeviceManager *p_linux_event_init(void)
 	return input_manager;
 }
 
+/**
+ * p_linux_event_deinit
+ *
+ * deinitializes the event manager.
+ * frees input device stuff
+ */
 void p_linux_event_deinit(PDeviceManager *input_manager)
 {
 	udev_unref(udev);

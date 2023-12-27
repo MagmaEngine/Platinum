@@ -8,7 +8,7 @@
  * Creates an application with GUI and input.
  * Takes a PWindowRequest for window creation and returns a PAppInstance.
  */
-PAppInstance *p_windows_app_init(void)
+PHANTOM_API PAppInstance *p_windows_app_init(void)
 {
 	setlocale(LC_ALL, "");
 
@@ -35,7 +35,7 @@ PAppInstance *p_windows_app_init(void)
  * Closes the application
  * Takes a PAppInstance to deconstruct.
  */
-void p_windows_app_deinit(PAppInstance *app_instance)
+PHANTOM_API void p_windows_app_deinit(PAppInstance *app_instance)
 {
 	while (app_instance->window_settings->num_items > 0)
 	{
@@ -53,5 +53,7 @@ void p_windows_app_deinit(PAppInstance *app_instance)
 	e_mutex_destroy(app_instance->window_mutex);
 	free(app_instance->window_mutex);
 	free(app_instance);
-	//FreeConsole(); // Closes the log console. Also ends the application
+
+	//FreeConsole(); // Closes the log console. Also ends the application.
+	//Not needed since console closes on its own anyways.
 }

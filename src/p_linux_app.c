@@ -7,7 +7,7 @@
  * Creates an application with GUI and input.
  * Takes a PWindowRequest for window creation and returns a PAppInstance.
  */
-PAppInstance *p_linux_app_init(void)
+PHANTOM_API PAppInstance *p_linux_app_init(void)
 {
 	// Set locale to same as system
 	setlocale(LC_ALL, "");
@@ -15,6 +15,7 @@ PAppInstance *p_linux_app_init(void)
 	PAppInstance *app_instance = malloc(sizeof *app_instance);
 
 
+	//init window mutex
 	app_instance->window_mutex = malloc(sizeof *app_instance->window_mutex);
 	e_mutex_init(app_instance->window_mutex);
 
@@ -23,6 +24,10 @@ PAppInstance *p_linux_app_init(void)
 
 	// create the input manager
 	app_instance->input_manager = p_event_init();
+
+	// create the vulkan instance
+	app_instance->vk_instance = p_vulkan_init();
+
 	return app_instance;
 }
 
@@ -32,7 +37,7 @@ PAppInstance *p_linux_app_init(void)
  * Closes the application
  * Takes a PAppInstance to deconstruct.
  */
-void p_linux_app_deinit(PAppInstance *app_instance)
+PHANTOM_API void p_linux_app_deinit(PAppInstance *app_instance)
 {
 	while (app_instance->window_settings->num_items > 0)
 	{
@@ -46,10 +51,11 @@ void p_linux_app_deinit(PAppInstance *app_instance)
 		e_dynarr_remove_unordered(app_instance->window_settings, index);
 	}
 	e_dynarr_deinit(app_instance->window_settings);
-	//free(window_settings);
+	e_mutex_destroy(app_instance->window_mutex);
 
 	p_event_deinit(app_instance->input_manager);
-	e_mutex_destroy(app_instance->window_mutex);
+	p_vulkan_deinit(app_instance->vk_instance);
+
 	free(app_instance->window_mutex);
 	free(app_instance);
 }

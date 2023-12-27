@@ -1,7 +1,22 @@
 #ifndef _PHANTOM_H
 #define _PHANTOM_H
 
+#ifdef PHANTOM_PLATFORM_WINDOWS
+#ifdef _PHANTOM_INTERNAL
+#define PHANTOM_API __declspec(dllexport)
+#else
+#define PHANTOM_API __declspec(dllimport)
+#endif // _PHANTOM_INTERNAL
+#elif defined PHANTOM_PLATFORM_LINUX
+#ifdef _PHANTOM_INTERNAL
+#define PHANTOM_API __attribute__((visibility("default")))
+#else
+#define PHANTOM_API
+#endif
+#endif // PHANTOM_PLATFORM_XXXXXX
+
 #include "enigma.h"
+#include <vulkan/vulkan.h>
 
 #ifndef _UINT
 #define _UINT
@@ -22,10 +37,10 @@ enum PWindowInteractType {
 };
 
 enum PWindowStatus {
-	P_WINDOW_ALIVE,
-	P_WINDOW_CLOSE,
-	P_WINDOW_INTERNAL_CLOSE,
-	P_WINDOW_MAX
+	P_WINDOW_STATUS_ALIVE,
+	P_WINDOW_STATUS_CLOSE,
+	P_WINDOW_STATUS_INTERNAL_CLOSE,
+	P_WINDOW_STATUS_MAX
 };
 
 typedef struct PAppInstance PAppInstance;
@@ -108,14 +123,18 @@ struct PAppInstance {
 	EDynarr *window_settings; // Array of (PWindowSettings *)
 	PDeviceManager *input_manager;
 	EMutex *window_mutex;
+
+	// Vulkan stuff
+	VkInstance *vk_instance;
 };
 
 
 
 // X11 systems
-#ifdef _PHANTOM_X11
+#ifdef PHANTOM_DISPLAY_X11
 
 #include <xcb/xcb.h>
+#include <vulkan/vulkan_xcb.h>
 
 // MUTEX for window-based operations
 
@@ -147,12 +166,18 @@ enum PAtomTypes {
  * Values here should never be set directly
  */
 struct PDisplayInfo {
+	// X info
+	xcb_atom_t atoms[P_ATOM_MAX];
 	xcb_connection_t *connection;
 	xcb_screen_t *screen;
 	xcb_window_t window;
-	xcb_atom_t atoms[P_ATOM_MAX];
+
+	// Window graphics
+	xcb_gcontext_t graphics_context;
+	xcb_pixmap_t pixmap;
 };
 
+// Window
 #define p_window_create p_x11_window_create
 #define p_window_close p_x11_window_close
 #define p_window_fullscreen p_x11_window_fullscreen
@@ -160,43 +185,63 @@ struct PDisplayInfo {
 #define p_window_windowed p_x11_window_windowed
 #define p_window_set_dimensions p_x11_window_set_dimensions
 #define p_window_set_name p_x11_window_set_name
-#define p_window_event_manage p_x11_window_event_manage
 
-
-void p_x11_window_create(PAppInstance *app_instance, const PWindowRequest window_request);
-void p_x11_window_close(PWindowSettings *window_settings);
-void p_x11_window_fullscreen(PWindowSettings *window_settings);
-void p_x11_window_docked_fullscreen(PWindowSettings *window_settings);
-void p_x11_window_windowed(PWindowSettings *window_settings, uint x, uint y, uint width, uint height);
-void p_x11_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height);
-void p_x11_window_set_name(PDisplayInfo *display_info, const wchar_t *name);
+PHANTOM_API void p_x11_window_create(PAppInstance *app_instance, const PWindowRequest window_request);
+PHANTOM_API void p_x11_window_close(PWindowSettings *window_settings);
+PHANTOM_API void p_x11_window_fullscreen(PWindowSettings *window_settings);
+PHANTOM_API void p_x11_window_docked_fullscreen(PWindowSettings *window_settings);
+PHANTOM_API void p_x11_window_windowed(PWindowSettings *window_settings, uint x, uint y, uint width, uint height);
+PHANTOM_API void p_x11_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height);
+PHANTOM_API void p_x11_window_set_name(PDisplayInfo *display_info, const wchar_t *name);
 EThreadResult p_x11_window_event_manage(EThreadArguments args);
+
+// Vulkan
+#define p_vulkan_init p_x11_vulkan_init
+#define p_vulkan_deinit p_x11_vulkan_deinit
+
+VkInstance *p_x11_vulkan_init(void);
+void p_x11_vulkan_deinit(VkInstance *vk_instance);
 
 #endif
 
 
 // Wayland systems
-#ifdef _PHANTOM_WAYLAND
+#ifdef PHANTOM_DISPLAY_WAYLAND
 
 #include <wayland-client.h>
 struct PDisplayInfo{
 };
 
+// Window
 #define p_window_create p_wayland_window_create
 #define p_window_close p_wayland_window_close
 #define p_window_fullscreen p_wayland_window_fullscreen
+#define p_window_docked_fullscreen p_wayland_window_docked_fullscreen
+#define p_window_windowed p_wayland_window_windowed
+#define p_window_set_dimensions p_wayland_window_set_dimensions
+#define p_window_set_name p_wayland_window_set_name
 
-PDisplayInfo *p_wayland_window_create(char *name, PWindowDisplayType *display_type);
-void p_wayland_window_close(PDisplayInfo *display_info);
-void p_wayland_window_fullscreen(PDisplayInfo *display_info, PWindowSettings *window_settings);
-void p_wayland_window_windowed_fullscreen(PDisplayInfo *display_info, PWindowSettings *window_settings);
-void p_wayland_window_windowed(PDisplayInfo *display_info, PWindowSettings *window_settings);
+PHANTOM_API void p_wayland_window_create(PAppInstance *app_instance, const PWindowRequest window_request);
+PHANTOM_API void p_wayland_window_close(PWindowSettings *window_settings);
+PHANTOM_API void p_wayland_window_fullscreen(PWindowSettings *window_settings);
+PHANTOM_API void p_wayland_window_docked_fullscreen(PWindowSettings *window_settings);
+PHANTOM_API void p_wayland_window_windowed(PWindowSettings *window_settings, uint x, uint y, uint width, uint height);
+PHANTOM_API void p_wayland_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height);
+PHANTOM_API void p_wayland_window_set_name(PDisplayInfo *display_info, const wchar_t *name);
+EThreadResult p_wayland_window_event_manage(EThreadArguments args);
 
-#endif // _PHANTOM_WAYLAND
+// Vulkan
+#define p_vulkan_init p_wayland_vulkan_init
+#define p_vulkan_deinit p_wayland_vulkan_deinit
+
+VkInstance *p_wayland_vulkan_init(void);
+void p_wayland_vulkan_deinit(VkInstance *vk_instance);
+
+#endif // PHANTOM_DISPLAY_WAYLAND
 
 
 // Linux systems
-#ifdef _PHANTOM_LINUX
+#ifdef PHANTOM_PLATFORM_LINUX
 
 /**
  * PDeviceManager
@@ -210,23 +255,25 @@ struct PDeviceManager {
 	EDynarr *libev_uinputs;
 };
 
-#define p_event_init p_linux_event_init
+// App
 #define p_app_init p_linux_app_init
-
-#define p_event_deinit p_linux_event_deinit
 #define p_app_deinit p_linux_app_deinit
 
-PAppInstance *p_linux_app_init(void);
-PDeviceManager *p_linux_event_init(void);
+PHANTOM_API PAppInstance *p_linux_app_init(void);
+PHANTOM_API void p_linux_app_deinit(PAppInstance *app_instance);
 
-void p_linux_app_deinit(PAppInstance *app_instance);
+// Event
+#define p_event_init p_linux_event_init
+#define p_event_deinit p_linux_event_deinit
+
+PDeviceManager *p_linux_event_init(void);
 void p_linux_event_deinit(PDeviceManager *input_manager);
 
 #endif
 
 
 // Windows systems
-#ifdef _PHANTOM_WIN32
+#ifdef PHANTOM_DISPLAY_WIN32
 
 #include <windows.h>
 
@@ -245,6 +292,7 @@ struct PDisplayInfo{
 	uint screen_height;
 };
 
+// Window
 #define p_window_create p_win32_window_create
 #define p_window_close p_win32_window_close
 #define p_window_fullscreen p_win32_window_fullscreen
@@ -252,24 +300,28 @@ struct PDisplayInfo{
 #define p_window_windowed p_win32_window_windowed
 #define p_window_set_dimensions p_win32_window_set_dimensions
 #define p_window_set_name p_win32_window_set_name
-#define p_window_event_manage p_win32_window_event_manage
 
+PHANTOM_API void p_win32_window_create(PAppInstance *app_instance, const PWindowRequest window_request);
+PHANTOM_API void p_win32_window_close(PWindowSettings *window_settings);
+PHANTOM_API void p_win32_window_fullscreen(PWindowSettings *window_settings);
+PHANTOM_API void p_win32_window_docked_fullscreen(PWindowSettings *window_settings);
+PHANTOM_API void p_win32_window_windowed(PWindowSettings *window_settings, uint x, uint y, uint width, uint height);
+PHANTOM_API void p_win32_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height);
+PHANTOM_API void p_win32_window_set_name(PDisplayInfo *display_info, const wchar_t *name);
+EThreadResult p_win32_window_event_manage(EThreadArguments args);
 
-void p_win32_window_create(PAppInstance *app_instance, const PWindowRequest window_request);
-void p_win32_window_close(PWindowSettings *window_settings);
-void p_win32_window_fullscreen(PWindowSettings *window_settings);
-void p_win32_window_docked_fullscreen(PWindowSettings *window_settings);
-void p_win32_window_windowed(PWindowSettings *window_settings, uint x, uint y, uint width, uint height);
-void p_win32_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height);
-void p_win32_window_set_name(PDisplayInfo *display_info, const wchar_t *name);
-EThreadResult WINAPI p_win32_window_event_manage(EThreadArguments args);
+// Vulkan
+#define p_vulkan_init p_win32_vulkan_init
+#define p_vulkan_deinit p_win32_vulkan_deinit
 
+VkInstance *p_win32_vulkan_init(void);
+void p_win32_vulkan_deinit(VkInstance *vk_instance);
 
-#endif // _PHANTOM_WIN32
+#endif // PHANTOM_DISPLAY_WIN32
 
 
 // Windows systems
-#ifdef _PHANTOM_WINDOWS
+#ifdef PHANTOM_PLATFORM_WINDOWS
 
 /**
  * PDeviceManager
@@ -283,18 +335,19 @@ struct PDeviceManager {
 	EDynarr *libev_uinputs;
 };
 
-#define p_event_init p_windows_event_init
+// App
 #define p_app_init p_windows_app_init
-
-#define p_event_deinit p_windows_event_deinit
 #define p_app_deinit p_windows_app_deinit
 
-PAppInstance *p_windows_app_init(void);
+PHANTOM_API PAppInstance *p_windows_app_init(void);
+PHANTOM_API void p_windows_app_deinit(PAppInstance *app_instance);
+
+// Event
+#define p_event_init p_windows_event_init
+#define p_event_deinit p_windows_event_deinit
+
 PDeviceManager *p_windows_event_init(void);
-
-void p_windows_app_deinit(PAppInstance *app_instance);
 void p_windows_event_deinit(PDeviceManager *input_manager);
-
 
 #endif
 

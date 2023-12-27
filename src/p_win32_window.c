@@ -1,10 +1,9 @@
 #include "phantom.h"
 #include <windows.h>
-#include <stdio.h>
 
 static HANDLE window_creation_event;
 
-void _win32_window_close(PAppInstance *app_instance, PWindowSettings *window_settingsi);
+void _win32_window_close(PAppInstance *app_instance, PWindowSettings *window_settings);
 
 /**
  * WindowProc
@@ -19,8 +18,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	PWindowSettings *window_settings;
 
 	if (window_data == NULL)
+	{
+		e_log_message(E_LOG_WARNING, L"Phantom", L"Window Data not associated yet.");
 		return DefWindowProc(hwnd, uMsg, wParam, lParam);
-	else {
+	} else {
 		window_settings = *(PWindowSettings **)&((char *)window_data)[sizeof (PAppInstance **)];
 		app_instance = ((PAppInstance **)window_data)[0];
 	}
@@ -144,15 +145,14 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				window_settings->event_calls->destroy();
 			PostQuitMessage(0);
 			e_mutex_lock(app_instance->window_mutex);
-			if (window_settings->status == P_WINDOW_ALIVE)
-				window_settings->status = P_WINDOW_CLOSE;
+			if (window_settings->status == P_WINDOW_STATUS_ALIVE)
+				window_settings->status = P_WINDOW_STATUS_CLOSE;
 			e_mutex_unlock(app_instance->window_mutex);
 			_win32_window_close(app_instance, window_settings);
 			return 0;
 		}
 
 		default:
-			e_log_message(E_LOG_DEBUG, L"Phantom", L"Unknown Event triggered.");
 			return DefWindowProc(hwnd, uMsg, wParam, lParam);
 	}
 }
@@ -162,7 +162,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
  *
  * updates window_settings with the values provided as x, y, width, and heigth
  */
-void p_win32_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height)
+PHANTOM_API void p_win32_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height)
 {
 	SetWindowPos(display_info->hwnd, HWND_TOP, x, y, width, height, SWP_FRAMECHANGED);
 	UpdateWindow(display_info->hwnd);
@@ -173,7 +173,7 @@ void p_win32_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, u
  *
  * sets the name of the window
  */
-void p_win32_window_set_name(PDisplayInfo *display_info, const wchar_t *name)
+PHANTOM_API void p_win32_window_set_name(PDisplayInfo *display_info, const wchar_t *name)
 {
 	SetWindowText(display_info->hwnd, name);
 }
@@ -184,7 +184,7 @@ void p_win32_window_set_name(PDisplayInfo *display_info, const wchar_t *name)
  * creates a window with parameters set from window_request.
  * returns a window_settings associated with the window.
  */
-void p_win32_window_create(PAppInstance *app_instance, const PWindowRequest window_request)
+PHANTOM_API void p_win32_window_create(PAppInstance *app_instance, const PWindowRequest window_request)
 {
 	PDisplayInfo *display_info = malloc(sizeof *display_info);
 	display_info->hInstance = GetModuleHandle(NULL);
@@ -205,7 +205,7 @@ void p_win32_window_create(PAppInstance *app_instance, const PWindowRequest wind
 	window_settings->display_info = display_info;
 	window_settings->event_calls = calloc(1, sizeof *window_settings->event_calls);
 	memcpy(window_settings->event_calls, &window_request.event_calls, sizeof *window_settings->event_calls);
-	window_settings->status = P_WINDOW_ALIVE;
+	window_settings->status = P_WINDOW_STATUS_ALIVE;
 
 	// Register the window class
 	WNDCLASS window_class = {0};
@@ -241,9 +241,9 @@ void p_win32_window_create(PAppInstance *app_instance, const PWindowRequest wind
  *
  * sends a signal to close the window and the event manager
  */
-void p_win32_window_close(PWindowSettings *window_settings)
+PHANTOM_API void p_win32_window_close(PWindowSettings *window_settings)
 {
-	window_settings->status = P_WINDOW_INTERNAL_CLOSE;
+	window_settings->status = P_WINDOW_STATUS_INTERNAL_CLOSE;
 	PDisplayInfo *display_info = window_settings->display_info;
 	if (display_info->hwnd != NULL)
 		DestroyWindow(display_info->hwnd);
@@ -267,7 +267,7 @@ void _win32_window_close(PAppInstance *app_instance, PWindowSettings *window_set
 		exit(1);
 	}
 	free(window_settings->display_info);
-	if (window_settings->status == P_WINDOW_CLOSE)
+	if (window_settings->status == P_WINDOW_STATUS_CLOSE)
 	{
 		free(window_settings->event_calls);
 		free(window_settings->name);
@@ -351,7 +351,7 @@ EThreadResult WINAPI p_win32_window_event_manage(EThreadArguments args)
  *
  * sets the window in window_settings to fullscreen
  */
-void p_win32_window_fullscreen(PWindowSettings *window_settings)
+PHANTOM_API void p_win32_window_fullscreen(PWindowSettings *window_settings)
 {
 	DEVMODE devMode = {0};
 	devMode.dmSize = sizeof(DEVMODE);
@@ -375,7 +375,7 @@ void p_win32_window_fullscreen(PWindowSettings *window_settings)
  *
  * sets the window in window_settings to (borderless/windowed) fullscreen
  */
-void p_win32_window_docked_fullscreen(PWindowSettings *window_settings)
+PHANTOM_API void p_win32_window_docked_fullscreen(PWindowSettings *window_settings)
 {
 	if (window_settings->display_type == P_DISPLAY_FULLSCREEN)
 	{
@@ -398,7 +398,7 @@ void p_win32_window_docked_fullscreen(PWindowSettings *window_settings)
  *
  * sets the window in window_settings to windowed mode and sets the dimensions
  */
-void p_win32_window_windowed(PWindowSettings *window_settings, uint x, uint y, uint width, uint height)
+PHANTOM_API void p_win32_window_windowed(PWindowSettings *window_settings, uint x, uint y, uint width, uint height)
 {
 	if (window_settings->display_type == P_DISPLAY_FULLSCREEN)
 	{

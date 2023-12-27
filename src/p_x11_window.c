@@ -2,10 +2,71 @@
 #include <enigma.h>
 #include <threads.h>
 #include <stdlib.h>
-#include <stdio.h>
 #include <string.h>
 #include <wchar.h>
-#include <xcb/xcb.h>
+#include <xcb/xcb_image.h>
+
+/**
+ * _resize_pixmap
+ *
+ * internal helper function that resizes the pixelmap
+ * to the dimensions specified by window_settings
+ */
+void _resize_pixmap(PWindowSettings *window_settings) {
+	// Create a new pixmap with the desired dimensions
+	xcb_connection_t *connection = window_settings->display_info->connection;
+	xcb_pixmap_t pixmap = window_settings->display_info->pixmap;
+	xcb_gcontext_t graphics_context = window_settings->display_info->graphics_context;
+	xcb_pixmap_t new_pixmap = xcb_generate_id(connection);
+	xcb_create_pixmap(connection, 24, new_pixmap, pixmap, window_settings->width, window_settings->height);
+
+	// Copy the content from the old pixmap to the new one
+	xcb_copy_area(connection, pixmap, new_pixmap, graphics_context, 0, 0, 0, 0, window_settings->width,
+			window_settings->height);
+
+	// Free the old pixmap
+	xcb_free_pixmap(connection, pixmap);
+
+	// Update the pixmap variable with the new pixmap
+	window_settings->display_info->pixmap = new_pixmap;
+}
+
+/**
+ * draw_stuff
+ *
+ * a test function for graphics that should be deleted as soon as vulkan is setup
+ */
+void draw_stuff(PDisplayInfo *display_info) {
+	xcb_connection_t *connection = display_info->connection;
+	xcb_gcontext_t graphics_context = display_info->graphics_context;
+	xcb_pixmap_t pixmap = display_info->pixmap;
+
+	// Create an image
+	uint width = 0xFF;
+	uint height = 0xFF;
+	xcb_image_t *image = xcb_image_create_native(connection, width, height, XCB_IMAGE_FORMAT_Z_PIXMAP, 24, NULL, 0, NULL);
+
+	// Draw something on the image (for example, a red rectangle)
+	for (uint y = 0; y < height; ++y) {
+		for (uint x = 0; x < width; ++x) {
+			uint32_t pixel = (x << 16) | (y << 8);
+			//e_log_message(E_LOG_INFO, L"Phantom", L"0x%.8X", pixel);
+			xcb_image_put_pixel(image, x, y, pixel);
+		}
+	}
+
+	// Put the image onto the pixmap
+	xcb_image_put(connection, pixmap, graphics_context, image, 0, 0, 0);
+
+	// Draw the pixmap onto the window
+	xcb_copy_area(connection, pixmap, display_info->window, graphics_context, 0, 0, 0, 0, width, height);
+
+	// Flush the request
+	xcb_flush(connection);
+
+	// Free resources
+	xcb_image_destroy(image);
+}
 
 /**
  * p_x11_generate_atom
@@ -32,7 +93,7 @@ xcb_atom_t p_x11_generate_atom(xcb_connection_t *connection, const char *atom_na
  * updates window_settings with the values provided as x, y, width, and heigth
  * and submits a request to the WM to resize the window
  */
-void p_x11_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height)
+PHANTOM_API void p_x11_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height)
 {
 	// resize
 	uint32_t params[4] = {x, y, width, height};
@@ -45,8 +106,8 @@ void p_x11_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uin
  * p_x11_window_set_name
  *
  * sets the name of the window
- */
-void p_x11_window_set_name(PDisplayInfo *display_info, const wchar_t *name)
+*/
+PHANTOM_API void p_x11_window_set_name(PDisplayInfo *display_info, const wchar_t *name)
 {
 	// convert name to char*
 	size_t utf8_size = wcstombs(NULL, name, 0);
@@ -70,6 +131,7 @@ void p_x11_window_set_name(PDisplayInfo *display_info, const wchar_t *name)
  */
 void p_x11_window_set_icon(PDisplayInfo *display_info, uint32_t *icon)
 {
+	// TODO: implement me and equiv version in win32, and put me in header
 }
 
 
@@ -79,8 +141,13 @@ void p_x11_window_set_icon(PDisplayInfo *display_info, uint32_t *icon)
  * creates a window with parameters set from window_request.
  * returns a window_settings associated with the window.
  */
-void p_x11_window_create(PAppInstance *app_instance, const PWindowRequest window_request)
+PHANTOM_API void p_x11_window_create(PAppInstance *app_instance, const PWindowRequest window_request)
 {
+	// Vulkan
+	uint32_t extensionCount = 0;
+	vkEnumerateInstanceExtensionProperties(NULL, &extensionCount, NULL);
+	e_log_message(E_LOG_INFO, L"Vulkan", L"Number of extensions: %i", extensionCount);
+
 	// Create an XCB connection and window
 	xcb_connection_t *connection = xcb_connect(NULL, NULL);
 
@@ -142,19 +209,8 @@ void p_x11_window_create(PAppInstance *app_instance, const PWindowRequest window
 	window_settings->display_info = display_info;
 	window_settings->event_calls = calloc(1, sizeof *window_settings->event_calls);
 	memcpy(window_settings->event_calls, &window_request.event_calls, sizeof *window_settings->event_calls);
-	window_settings->status = P_WINDOW_ALIVE;
+	window_settings->status = P_WINDOW_STATUS_ALIVE;
 
-	// creates the window
-	xcb_create_window(
-			connection,
-			XCB_COPY_FROM_PARENT,
-			window,
-			screen->root,
-			window_settings->x, window_settings->y, window_settings->width, window_settings->height,
-			border_width,
-			class,
-			screen->root_visual,
-			XCB_CW_BACK_PIXEL, &screen->black_pixel);
 
 	// Listen different events in the window
 	// PROPERTY_CHANGE:		When window properties change (windowed, fullscreen, windowed fullscreen)
@@ -172,9 +228,33 @@ void p_x11_window_create(PAppInstance *app_instance, const PWindowRequest window
 		XCB_EVENT_MASK_STRUCTURE_NOTIFY |
 		XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY |
 		XCB_EVENT_MASK_FOCUS_CHANGE;
-	xcb_change_window_attributes(connection, window, XCB_CW_EVENT_MASK, &event_mask);
+	uint32_t value_list[2] = {screen->black_pixel, event_mask};
+
+	// creates the window
+	xcb_create_window(
+			connection,
+			XCB_COPY_FROM_PARENT,
+			window,
+			screen->root,
+			window_settings->x, window_settings->y, window_settings->width, window_settings->height,
+			border_width,
+			class,
+			screen->root_visual,
+			XCB_CW_BACK_PIXEL | XCB_CW_EVENT_MASK,
+			&value_list);
 
 	p_window_set_name(display_info, window_settings->name);
+
+	// Create a graphics context
+	xcb_gcontext_t gc = xcb_generate_id(connection);
+	uint32_t mask = XCB_GC_FOREGROUND | XCB_GC_BACKGROUND;
+	uint32_t values[2] = {screen->black_pixel, screen->white_pixel};
+	xcb_create_gc(connection, gc, window, mask, values);
+	// Create a pixmap
+	xcb_pixmap_t pixmap = xcb_generate_id(connection);
+	xcb_create_pixmap(connection, screen->root_depth, pixmap, window, window_settings->width, window_settings->height);
+	display_info->graphics_context = gc;
+	display_info->pixmap = pixmap;
 
 	// Set display based on type
 	switch (window_request.display_type)
@@ -205,7 +285,7 @@ void p_x11_window_create(PAppInstance *app_instance, const PWindowRequest window
 	EThreadArguments args = malloc(sizeof (PAppInstance *) + sizeof (PWindowSettings *));
 	memcpy(args, &app_instance, sizeof (PAppInstance **));
 	memcpy(&((char *)args)[sizeof (PAppInstance **)], &window_settings, sizeof (PWindowSettings **));
-	window_settings->event_manager = e_thread_create(p_window_event_manage, args);
+	window_settings->event_manager = e_thread_create(p_x11_window_event_manage, args);
 }
 
 /**
@@ -213,9 +293,9 @@ void p_x11_window_create(PAppInstance *app_instance, const PWindowRequest window
  *
  * sends a signal to close the window and the connection to the Xserver
  */
-void p_x11_window_close(PWindowSettings *window_settings)
+PHANTOM_API void p_x11_window_close(PWindowSettings *window_settings)
 {
-	window_settings->status = P_WINDOW_INTERNAL_CLOSE;
+	window_settings->status = P_WINDOW_STATUS_INTERNAL_CLOSE;
 	xcb_destroy_window(window_settings->display_info->connection, window_settings->display_info->window);
 	xcb_flush(window_settings->display_info->connection);
 }
@@ -240,7 +320,7 @@ void _x11_window_close(PAppInstance *app_instance, PWindowSettings *window_setti
 	xcb_unmap_window(display_info->connection, display_info->window);
 	xcb_disconnect(display_info->connection);
 	free(window_settings->display_info);
-	if (window_settings->status == P_WINDOW_CLOSE)
+	if (window_settings->status == P_WINDOW_STATUS_CLOSE)
 	{
 		free(window_settings->event_calls);
 		free(window_settings->name);
@@ -267,14 +347,14 @@ EThreadResult p_x11_window_event_manage(EThreadArguments args)
 	PEventCalls *event_calls = window_settings->event_calls;
 
 
-	while (window_settings->status == P_WINDOW_ALIVE) {
+	while (window_settings->status == P_WINDOW_STATUS_ALIVE) {
 		xcb_generic_event_t *event = xcb_wait_for_event(display_info->connection);
 		if (!event)
 		{
 			e_log_message(E_LOG_WARNING, L"Phantom", L"Event was null...");
 			e_mutex_lock(app_instance->window_mutex);
-			if (window_settings->status == P_WINDOW_ALIVE)
-				window_settings->status = P_WINDOW_CLOSE;
+			if (window_settings->status == P_WINDOW_STATUS_ALIVE)
+				window_settings->status = P_WINDOW_STATUS_CLOSE;
 			e_mutex_unlock(app_instance->window_mutex);
 			_x11_window_close(app_instance, window_settings);
 			break;
@@ -285,6 +365,7 @@ EThreadResult p_x11_window_event_manage(EThreadArguments args)
 			case XCB_EXPOSE:
 			{
 				e_log_message(E_LOG_DEBUG, L"Phantom", L"Expose Event triggered");
+				draw_stuff(display_info);
 				xcb_expose_event_t *expose_event = (xcb_expose_event_t *)event;
 				E_UNUSED(expose_event);
 				// TODO: redraw (only new part?)
@@ -300,6 +381,7 @@ EThreadResult p_x11_window_event_manage(EThreadArguments args)
 				window_settings->y = config_notify_event->y;
 				window_settings->width = config_notify_event->width;
 				window_settings->height = config_notify_event->height;
+				_resize_pixmap(window_settings);
 				if (event_calls->enable_configure && event_calls->configure != NULL)
 					event_calls->configure();
 				break;
@@ -411,8 +493,8 @@ EThreadResult p_x11_window_event_manage(EThreadArguments args)
 					event_calls->destroy();
 
 				e_mutex_lock(app_instance->window_mutex);
-				if (window_settings->status == P_WINDOW_ALIVE)
-					window_settings->status = P_WINDOW_CLOSE;
+				if (window_settings->status == P_WINDOW_STATUS_ALIVE)
+					window_settings->status = P_WINDOW_STATUS_CLOSE;
 				e_mutex_unlock(app_instance->window_mutex);
 				_x11_window_close(app_instance, window_settings);
 
@@ -435,7 +517,7 @@ EThreadResult p_x11_window_event_manage(EThreadArguments args)
  *
  * sets the window in window_settings to fullscreen
  */
-void p_x11_window_fullscreen(PWindowSettings *window_settings)
+PHANTOM_API void p_x11_window_fullscreen(PWindowSettings *window_settings)
 {
 	PDisplayInfo *display_info = window_settings->display_info;
 
@@ -481,7 +563,7 @@ void p_x11_window_fullscreen(PWindowSettings *window_settings)
  *
  * sets the window in window_settings to (borderless/windowed) fullscreen
  */
-void p_x11_window_docked_fullscreen(PWindowSettings *window_settings)
+PHANTOM_API void p_x11_window_docked_fullscreen(PWindowSettings *window_settings)
 {
 	PDisplayInfo *display_info = window_settings->display_info;
 	xcb_unmap_window(display_info->connection, display_info->window);
@@ -540,7 +622,7 @@ void p_x11_window_docked_fullscreen(PWindowSettings *window_settings)
  *
  * sets the window in window_settings to windowed mode and sets the dimensions
  */
-void p_x11_window_windowed(PWindowSettings *window_settings, uint x, uint y, uint width, uint height)
+PHANTOM_API void p_x11_window_windowed(PWindowSettings *window_settings, uint x, uint y, uint width, uint height)
 {
 	PDisplayInfo *display_info = window_settings->display_info;
 
