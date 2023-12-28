@@ -1,4 +1,6 @@
-phantom_srcs = []
+phantom_srcs = [
+      files('src/p_vulkan.c'),
+      ]
 
 phantom_deps = [
   dep_libenigma,
@@ -37,7 +39,6 @@ elif host_machine.system() == 'linux'
   if dep_x11[0].found() and dep_x11[1].found()
     phantom_srcs += [
       files('src/p_x11_window.c'),
-      files('src/p_x11_vulkan.c'),
       ]
     phantom_deps += dep_x11
     phantom_c_args += [

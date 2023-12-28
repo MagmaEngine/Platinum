@@ -3,14 +3,14 @@
 
 static HANDLE window_creation_event;
 
-void _win32_window_close(PAppInstance *app_instance, PWindowSettings *window_settings);
+static void _win32_window_close(PAppInstance *app_instance, PWindowSettings *window_settings);
 
 /**
  * WindowProc
  *
  * This internal function gets run by the event manager and responds to different messages
  */
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	void *window_data = (void *)GetWindowLongPtr(hwnd, GWLP_USERDATA);
 
@@ -256,11 +256,11 @@ PHANTOM_API void p_win32_window_close(PWindowSettings *window_settings)
  *
  * internal close function that actually closes the window and frees data
  */
-void _win32_window_close(PAppInstance *app_instance, PWindowSettings *window_settings)
+static void _win32_window_close(PAppInstance *app_instance, PWindowSettings *window_settings)
 {
 	// If window exists delete it.
 	e_mutex_lock(app_instance->window_mutex);
-	int index = e_dynarr_contains(app_instance->window_settings, &window_settings);
+	int index = e_dynarr_find(app_instance->window_settings, &window_settings);
 	if (index == -1)
 	{
 		e_log_message(E_LOG_ERROR, L"Phantom", L"Window does not exist...");
@@ -285,7 +285,7 @@ void _win32_window_close(PAppInstance *app_instance, PWindowSettings *window_set
  * This function runs in its own thread and manages window manager events
  * returns 0
  */
-EThreadResult WINAPI p_win32_window_event_manage(EThreadArguments args)
+static EThreadResult WINAPI p_win32_window_event_manage(EThreadArguments args)
 {
 	PAppInstance *app_instance = ((PAppInstance **)args)[0];
 	PWindowSettings *window_settings = *(PWindowSettings **)&((char *)args)[sizeof (PAppInstance **)];

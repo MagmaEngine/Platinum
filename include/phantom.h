@@ -49,6 +49,7 @@ typedef struct PDisplayInfo PDisplayInfo;
 typedef struct PEventCalls PEventCalls;
 typedef struct PWindowRequest PWindowRequest;
 typedef struct PWindowSettings PWindowSettings;
+typedef struct PVulkanData PVulkanData;
 
 /**
  * PEventCalls
@@ -113,6 +114,15 @@ struct PWindowRequest {
 	PEventCalls event_calls;
 };
 
+/**
+ * PVulkanData
+ *
+ * This struct contains data relevant to vulkan
+ */
+struct PVulkanData {
+	VkInstance instance;
+	VkDebugUtilsMessengerEXT debug_messenger;
+};
 
 /**
  * PAppInstance
@@ -123,18 +133,20 @@ struct PAppInstance {
 	EDynarr *window_settings; // Array of (PWindowSettings *)
 	PDeviceManager *input_manager;
 	EMutex *window_mutex;
-
-	// Vulkan stuff
-	VkInstance *vk_instance;
+	PVulkanData * vulkan_data;
 };
 
+
+// Vulkan
+PVulkanData *p_vulkan_init(void);
+void p_vulkan_deinit(PVulkanData *vulkan_data);
+void p_vulkan_list_available_extensions(void);
 
 
 // X11 systems
 #ifdef PHANTOM_DISPLAY_X11
 
 #include <xcb/xcb.h>
-#include <vulkan/vulkan_xcb.h>
 
 // MUTEX for window-based operations
 
@@ -193,14 +205,6 @@ PHANTOM_API void p_x11_window_docked_fullscreen(PWindowSettings *window_settings
 PHANTOM_API void p_x11_window_windowed(PWindowSettings *window_settings, uint x, uint y, uint width, uint height);
 PHANTOM_API void p_x11_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height);
 PHANTOM_API void p_x11_window_set_name(PDisplayInfo *display_info, const wchar_t *name);
-EThreadResult p_x11_window_event_manage(EThreadArguments args);
-
-// Vulkan
-#define p_vulkan_init p_x11_vulkan_init
-#define p_vulkan_deinit p_x11_vulkan_deinit
-
-VkInstance *p_x11_vulkan_init(void);
-void p_x11_vulkan_deinit(VkInstance *vk_instance);
 
 #endif
 
@@ -228,7 +232,6 @@ PHANTOM_API void p_wayland_window_docked_fullscreen(PWindowSettings *window_sett
 PHANTOM_API void p_wayland_window_windowed(PWindowSettings *window_settings, uint x, uint y, uint width, uint height);
 PHANTOM_API void p_wayland_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height);
 PHANTOM_API void p_wayland_window_set_name(PDisplayInfo *display_info, const wchar_t *name);
-EThreadResult p_wayland_window_event_manage(EThreadArguments args);
 
 // Vulkan
 #define p_vulkan_init p_wayland_vulkan_init
@@ -308,7 +311,6 @@ PHANTOM_API void p_win32_window_docked_fullscreen(PWindowSettings *window_settin
 PHANTOM_API void p_win32_window_windowed(PWindowSettings *window_settings, uint x, uint y, uint width, uint height);
 PHANTOM_API void p_win32_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height);
 PHANTOM_API void p_win32_window_set_name(PDisplayInfo *display_info, const wchar_t *name);
-EThreadResult p_win32_window_event_manage(EThreadArguments args);
 
 // Vulkan
 #define p_vulkan_init p_win32_vulkan_init

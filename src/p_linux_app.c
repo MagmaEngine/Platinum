@@ -26,7 +26,7 @@ PHANTOM_API PAppInstance *p_linux_app_init(void)
 	app_instance->input_manager = p_event_init();
 
 	// create the vulkan instance
-	app_instance->vk_instance = p_vulkan_init();
+	app_instance->vulkan_data = p_vulkan_init();
 
 	return app_instance;
 }
@@ -44,7 +44,7 @@ PHANTOM_API void p_linux_app_deinit(PAppInstance *app_instance)
 		PWindowSettings *window_settings = *((PWindowSettings **)app_instance->window_settings->arr);
 		p_window_close(window_settings);
 		e_thread_join(window_settings->event_manager);
-		int index = e_dynarr_contains(app_instance->window_settings, &window_settings);
+		int index = e_dynarr_find(app_instance->window_settings, &window_settings);
 		free(window_settings->event_calls);
 		free(window_settings->name);
 		free(window_settings);
@@ -54,7 +54,7 @@ PHANTOM_API void p_linux_app_deinit(PAppInstance *app_instance)
 	e_mutex_destroy(app_instance->window_mutex);
 
 	p_event_deinit(app_instance->input_manager);
-	p_vulkan_deinit(app_instance->vk_instance);
+	p_vulkan_deinit(app_instance->vulkan_data);
 
 	free(app_instance->window_mutex);
 	free(app_instance);

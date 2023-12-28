@@ -41,7 +41,7 @@ PHANTOM_API void p_windows_app_deinit(PAppInstance *app_instance)
 	{
 		PWindowSettings *window_settings = *((PWindowSettings **)app_instance->window_settings->arr);
 		p_window_close(window_settings);
-		int index = e_dynarr_contains(app_instance->window_settings, &window_settings);
+		int index = e_dynarr_find(app_instance->window_settings, &window_settings);
 		free(window_settings->event_calls);
 		free(window_settings->name);
 		free(window_settings);

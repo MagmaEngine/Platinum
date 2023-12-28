@@ -1,10 +1,11 @@
 #include "phantom.h"
 #include <enigma.h>
-#include <threads.h>
 #include <stdlib.h>
 #include <string.h>
 #include <wchar.h>
 #include <xcb/xcb_image.h>
+
+static EThreadResult p_x11_window_event_manage(EThreadArguments args);
 
 /**
  * _resize_pixmap
@@ -12,7 +13,7 @@
  * internal helper function that resizes the pixelmap
  * to the dimensions specified by window_settings
  */
-void _resize_pixmap(PWindowSettings *window_settings) {
+static void _resize_pixmap(PWindowSettings *window_settings) {
 	// Create a new pixmap with the desired dimensions
 	xcb_connection_t *connection = window_settings->display_info->connection;
 	xcb_pixmap_t pixmap = window_settings->display_info->pixmap;
@@ -36,7 +37,7 @@ void _resize_pixmap(PWindowSettings *window_settings) {
  *
  * a test function for graphics that should be deleted as soon as vulkan is setup
  */
-void draw_stuff(PDisplayInfo *display_info) {
+static void draw_stuff(PDisplayInfo *display_info) {
 	xcb_connection_t *connection = display_info->connection;
 	xcb_gcontext_t graphics_context = display_info->graphics_context;
 	xcb_pixmap_t pixmap = display_info->pixmap;
@@ -74,7 +75,7 @@ void draw_stuff(PDisplayInfo *display_info) {
  * generates an xcb atom and returns it.
  * Returns XCB_ATOM_NONE if atom cannot be found.
  */
-xcb_atom_t p_x11_generate_atom(xcb_connection_t *connection, const char *atom_name)
+static xcb_atom_t p_x11_generate_atom(xcb_connection_t *connection, const char *atom_name)
 {
 	xcb_intern_atom_cookie_t cookie = xcb_intern_atom(connection, 0, strlen(atom_name), atom_name);
 	xcb_intern_atom_reply_t *reply = xcb_intern_atom_reply(connection, cookie, NULL);
@@ -139,15 +140,11 @@ void p_x11_window_set_icon(PDisplayInfo *display_info, uint32_t *icon)
  * p_x11_window_create
  *
  * creates a window with parameters set from window_request.
- * returns a window_settings associated with the window.
+ * adds the window_settings associated with the window to app_instance.
  */
 PHANTOM_API void p_x11_window_create(PAppInstance *app_instance, const PWindowRequest window_request)
 {
-	// Vulkan
-	uint32_t extensionCount = 0;
-	vkEnumerateInstanceExtensionProperties(NULL, &extensionCount, NULL);
-	e_log_message(E_LOG_INFO, L"Vulkan", L"Number of extensions: %i", extensionCount);
-
+	// Vulkan: TODO: Add vulkan surface
 	// Create an XCB connection and window
 	xcb_connection_t *connection = xcb_connect(NULL, NULL);
 
@@ -306,11 +303,11 @@ PHANTOM_API void p_x11_window_close(PWindowSettings *window_settings)
  *
  * internal close function that actually closes the window and frees data
  */
-void _x11_window_close(PAppInstance *app_instance, PWindowSettings *window_settings)
+static void _x11_window_close(PAppInstance *app_instance, PWindowSettings *window_settings)
 {
 	// If window exists delete it.
 	e_mutex_lock(app_instance->window_mutex);
-	int index = e_dynarr_contains(app_instance->window_settings, &window_settings);
+	int index = e_dynarr_find(app_instance->window_settings, &window_settings);
 	if (index == -1)
 	{
 		e_log_message(E_LOG_ERROR, L"Phantom", L"Window does not exist...");
@@ -337,7 +334,7 @@ void _x11_window_close(PAppInstance *app_instance, PWindowSettings *window_setti
  * This function runs in its own thread and manages window manager events
  * returns NULL
  */
-EThreadResult p_x11_window_event_manage(EThreadArguments args)
+static EThreadResult p_x11_window_event_manage(EThreadArguments args)
 {
 	// unpack args
 	PAppInstance *app_instance = ((PAppInstance **)args)[0];
@@ -364,7 +361,6 @@ EThreadResult p_x11_window_event_manage(EThreadArguments args)
 			// TODO: experiment with capturing mouse and keyboard
 			case XCB_EXPOSE:
 			{
-				e_log_message(E_LOG_DEBUG, L"Phantom", L"Expose Event triggered");
 				draw_stuff(display_info);
 				xcb_expose_event_t *expose_event = (xcb_expose_event_t *)event;
 				E_UNUSED(expose_event);
@@ -375,7 +371,6 @@ EThreadResult p_x11_window_event_manage(EThreadArguments args)
 			}
 			case XCB_CONFIGURE_NOTIFY:
 			{
-				e_log_message(E_LOG_DEBUG, L"Phantom", L"Configure Notify Event triggered");
 				xcb_configure_notify_event_t *config_notify_event = (xcb_configure_notify_event_t *)event;
 				window_settings->x = config_notify_event->x;
 				window_settings->y = config_notify_event->y;
@@ -388,7 +383,6 @@ EThreadResult p_x11_window_event_manage(EThreadArguments args)
 			}
 			case XCB_PROPERTY_NOTIFY:
 			{
-				e_log_message(E_LOG_DEBUG, L"Phantom", L"Property Notify Event triggered");
 				xcb_property_notify_event_t *property_notify_event = (xcb_property_notify_event_t *)event;
 				E_UNUSED(property_notify_event);
 
@@ -439,7 +433,6 @@ EThreadResult p_x11_window_event_manage(EThreadArguments args)
 			}
 			case XCB_CLIENT_MESSAGE:
 			{
-				e_log_message(E_LOG_DEBUG, L"Phantom", L"Client Message Event triggered");
 				xcb_client_message_event_t *message_event = (xcb_client_message_event_t *)event;
 				E_UNUSED(message_event);
 				if (event_calls->enable_client && event_calls->client != NULL)
@@ -448,7 +441,6 @@ EThreadResult p_x11_window_event_manage(EThreadArguments args)
 			}
 			case XCB_FOCUS_IN:
 			{
-				e_log_message(E_LOG_DEBUG, L"Phantom", L"Focus In Event triggered");
 				xcb_focus_in_event_t *focus_in_event = (xcb_focus_in_event_t *)event;
 				E_UNUSED(focus_in_event);
 				if (event_calls->enable_focus_in && event_calls->focus_in != NULL)
@@ -457,7 +449,6 @@ EThreadResult p_x11_window_event_manage(EThreadArguments args)
 			}
 			case XCB_FOCUS_OUT:
 			{
-				e_log_message(E_LOG_DEBUG, L"Phantom", L"Focus Out Event triggered");
 				xcb_focus_out_event_t *focus_out_event = (xcb_focus_out_event_t *)event;
 				E_UNUSED(focus_out_event);
 				if (event_calls->enable_focus_out && event_calls->focus_out != NULL)
@@ -466,7 +457,6 @@ EThreadResult p_x11_window_event_manage(EThreadArguments args)
 			}
 			case XCB_ENTER_NOTIFY:
 			{
-				e_log_message(E_LOG_DEBUG, L"Phantom", L"Enter Notify Event triggered");
 				xcb_enter_notify_event_t *enter_notify_event = (xcb_enter_notify_event_t *)event;
 				E_UNUSED(enter_notify_event);
 				if (event_calls->enable_enter && event_calls->enter != NULL)
@@ -475,7 +465,6 @@ EThreadResult p_x11_window_event_manage(EThreadArguments args)
 			}
 			case XCB_LEAVE_NOTIFY:
 			{
-				e_log_message(E_LOG_DEBUG, L"Phantom", L"Leave Notify Event triggered");
 				xcb_leave_notify_event_t *leave_notify_event = (xcb_leave_notify_event_t *)event;
 				E_UNUSED(leave_notify_event);
 				if (event_calls->enable_leave && event_calls->leave != NULL)
@@ -484,7 +473,6 @@ EThreadResult p_x11_window_event_manage(EThreadArguments args)
 			}
 			case XCB_DESTROY_NOTIFY:
 			{
-				e_log_message(E_LOG_DEBUG, L"Phantom", L"Destroy Notify Event triggered");
 				xcb_destroy_notify_event_t *destroy_notify_event = (xcb_destroy_notify_event_t *)event;
 				E_UNUSED(destroy_notify_event);
 				// TODO: handle errors
@@ -498,11 +486,6 @@ EThreadResult p_x11_window_event_manage(EThreadArguments args)
 				e_mutex_unlock(app_instance->window_mutex);
 				_x11_window_close(app_instance, window_settings);
 
-				break;
-			}
-			default:
-			{
-				e_log_message(E_LOG_DEBUG, L"Phantom", L"Unknown Event triggered.");
 				break;
 			}
 		}
