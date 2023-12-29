@@ -122,6 +122,8 @@ struct PWindowRequest {
 struct PVulkanData {
 	VkInstance instance;
 	VkDebugUtilsMessengerEXT debug_messenger;
+	EDynarr *compatible_devices;
+	VkPhysicalDevice current_physical_device;
 };
 
 /**
