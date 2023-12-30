@@ -50,6 +50,7 @@ typedef struct PEventCalls PEventCalls;
 typedef struct PWindowRequest PWindowRequest;
 typedef struct PWindowSettings PWindowSettings;
 typedef struct PVulkanData PVulkanData;
+typedef EOptionalUINT32 PVulkanQueueFamilyInfo;
 
 /**
  * PEventCalls
@@ -124,7 +125,10 @@ struct PVulkanData {
 	VkDebugUtilsMessengerEXT debug_messenger;
 	EDynarr *compatible_devices;
 	VkPhysicalDevice current_physical_device;
+
+	PVulkanQueueFamilyInfo graphics_queue_family;
 };
+
 
 /**
  * PAppInstance

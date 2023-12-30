@@ -3,11 +3,9 @@
 
 #ifdef PHANTOM_DISPLAY_X11
 #include <vulkan/vulkan_xcb.h>
-#endif // PHANTOM_DISPLAY_X11
-
-#ifdef PHANTOM_DISPLAY_WIN32
+#elif defined PHANTOM_DISPLAY_WIN32
 #include <vulkan/vulkan_win32.h>
-#endif // PHANTOM_DISPLAY_WIN32
+#endif // PHANTOM_DISPLAY_XXXXXX
 
 /**
  * p_vulkan_list_available_extensions
@@ -45,11 +43,6 @@ void p_vulkan_list_available_devices(VkInstance instance)
 		e_log_message(E_LOG_ERROR, L"Vulkan General", L"Failed to find GPUs with Vulkan support!");
 		exit(1);
 	}
-	VkPhysicalDevice *vulkan_available_devices = malloc(vulkan_available_device_count * sizeof(VkPhysicalDevice));
-	vkEnumeratePhysicalDevices(instance, &vulkan_available_device_count, vulkan_available_devices);
-	for (uint i = 0; i < vulkan_available_device_count; i++)
-		e_log_message(E_LOG_INFO, L"Vulkan General", L"%s", vulkan_available_devices[i]);
-	free(vulkan_available_devices);
 }
 
 /**
@@ -249,6 +242,36 @@ static void p_vulkan_create_instance(PVulkanData *vulkan_data, const VkInstanceC
 }
 
 /**
+ * p_vulkan_find_queue_families
+ *
+ * finds queue families of the current_physical_device and assigns them to vulkan_data
+ */
+static PVulkanQueueFamilyInfo p_vulkan_find_queue_families(
+		const VkPhysicalDevice device,
+		const VkQueueFlags queue_flags)
+{
+	PVulkanQueueFamilyInfo queue_family_info;
+	uint32_t queue_family_count = 0;
+	vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, NULL);
+	VkQueueFamilyProperties *queue_families = malloc(queue_family_count * sizeof *queue_families);
+	vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, queue_families);
+
+	for (uint i = 0; i < queue_family_count; i++)
+	{
+		if (queue_families[i].queueFlags & queue_flags)
+		{
+			queue_family_info.exists = true;
+			queue_family_info.value = i;
+			goto queue_found;
+		}
+	}
+	queue_family_info.exists = false;
+queue_found:
+	free(queue_families);
+	return queue_family_info;
+}
+
+/**
  * p_vulkan_pick_physical_device
  *
  * picks the physical device for use with vulkan and adds it to vulkan_data
@@ -256,10 +279,6 @@ static void p_vulkan_create_instance(PVulkanData *vulkan_data, const VkInstanceC
 static void p_vulkan_pick_physical_device(PVulkanData *vulkan_data)
 {
 	vulkan_data->current_physical_device = VK_NULL_HANDLE;
-#ifdef PHANTOM_DEBUG_VULKAN
-	p_vulkan_list_available_devices(vulkan_data->instance);
-#endif // PHANTOM_DEBUG_VULKAN
-
 	uint32_t vulkan_available_device_count = 0;
 	vkEnumeratePhysicalDevices(vulkan_data->instance, &vulkan_available_device_count, NULL);
 
@@ -270,12 +289,14 @@ static void p_vulkan_pick_physical_device(PVulkanData *vulkan_data)
 
 	// check device suitability, assign scores
 	EDynarr *device_score = e_dynarr_init(sizeof (int), compatible_devices->num_items);
+	EDynarr *graphics_queue_family_info = e_dynarr_init(sizeof (PVulkanQueueFamilyInfo), compatible_devices->num_items);
 	for (uint i = 0; i < compatible_devices->num_items; i++) {
 		int score = 0;
+		VkPhysicalDevice device = E_DYNARR_GET(compatible_devices, VkPhysicalDevice, i);
 		VkPhysicalDeviceProperties device_properties;
-		vkGetPhysicalDeviceProperties(E_DYNARR_GET(compatible_devices, VkPhysicalDevice, i), &device_properties);
+		vkGetPhysicalDeviceProperties(device, &device_properties);
 		VkPhysicalDeviceFeatures device_features;
-		vkGetPhysicalDeviceFeatures(E_DYNARR_GET(compatible_devices, VkPhysicalDevice, i), &device_features);
+		vkGetPhysicalDeviceFeatures(device, &device_features);
 
 		// lots of score goes to discrete gpus
 		if (device_properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
@@ -284,8 +305,12 @@ static void p_vulkan_pick_physical_device(PVulkanData *vulkan_data)
 		// Maximum possible size of textures affects graphics quality
 		score += device_properties.limits.maxImageDimension2D;
 
+		PVulkanQueueFamilyInfo current_graphics_queue_family_info = p_vulkan_find_queue_families(device,
+				VK_QUEUE_GRAPHICS_BIT);
+		e_dynarr_add(graphics_queue_family_info, &current_graphics_queue_family_info);
+
 		// remove unqualified devices from compatible_devices
-		if (!device_features.geometryShader)
+		if (!device_features.geometryShader || !current_graphics_queue_family_info.exists)
 			score = -1;
 
 		e_dynarr_add(device_score, E_VOID_PTR_FROM_VALUE(int, score));
@@ -305,6 +330,7 @@ static void p_vulkan_pick_physical_device(PVulkanData *vulkan_data)
 		} else if (current_device_score < 0) {
 			e_dynarr_remove_ordered(compatible_devices, i);
 			e_dynarr_remove_ordered(device_score, i);
+			e_dynarr_remove_ordered(graphics_queue_family_info, i);
 		} else {
 			i++;
 		}
@@ -312,7 +338,11 @@ static void p_vulkan_pick_physical_device(PVulkanData *vulkan_data)
 	e_dynarr_deinit(device_score);
 
 	if (max_score_index >= 0)
+	{
 		vulkan_data->current_physical_device = E_DYNARR_GET(compatible_devices, VkPhysicalDevice, max_score_index);
+		vulkan_data->graphics_queue_family = E_DYNARR_GET(graphics_queue_family_info, PVulkanQueueFamilyInfo, max_score_index);
+	}
+	e_dynarr_deinit(graphics_queue_family_info);
 
 	if (vulkan_data->current_physical_device == VK_NULL_HANDLE)
 	{
