@@ -43,21 +43,17 @@ enum PWindowStatus {
 	P_WINDOW_STATUS_MAX
 };
 
-typedef struct PAppInstance PAppInstance;
+// Platform specific structs get typedefed here
+// to make them visible before they are defined
 typedef struct PDeviceManager PDeviceManager;
 typedef struct PDisplayInfo PDisplayInfo;
-typedef struct PEventCalls PEventCalls;
-typedef struct PWindowRequest PWindowRequest;
-typedef struct PWindowSettings PWindowSettings;
-typedef struct PVulkanData PVulkanData;
-typedef EOptionalUINT32 PVulkanQueueFamilyInfo;
 
 /**
  * PEventCalls
  *
  * This struct is used to set user-based functionality onto events from the window manager
  */
-struct PEventCalls {
+typedef struct {
 	bool enable_expose;
 	bool enable_configure;
 	bool enable_property;
@@ -76,7 +72,7 @@ struct PEventCalls {
 	void (*enter)(void);
 	void (*leave)(void);
 	void (*destroy)(void);
-};
+} PEventCalls;
 
 /**
  * PWindowSettings
@@ -84,7 +80,7 @@ struct PEventCalls {
  * This struct acts as a status showing the window's current settings
  * Values here should never be set directly
  */
-struct PWindowSettings {
+typedef struct {
 	wchar_t *name;
 	uint x;
 	uint y;
@@ -96,15 +92,14 @@ struct PWindowSettings {
 	EThread event_manager;
 	PEventCalls *event_calls;
 	PDisplayInfo *display_info;
-};
+} PWindowSettings;
 
 /**
  * PWindowRequest
  *
  * This struct is used to create a new window with the requested settings
- * Values here should never be set directly
  */
-struct PWindowRequest {
+typedef struct {
 	wchar_t *name;
 	uint x;
 	uint y;
@@ -113,40 +108,74 @@ struct PWindowRequest {
 	enum PWindowDisplayType display_type;
 	enum PWindowInteractType interact_type;
 	PEventCalls event_calls;
-};
+} PWindowRequest;
+
+/**
+ * PVulkanQueueFamilyInfo
+ *
+ * This struct is used to store information about the queue family
+ */
+typedef struct {
+	VkQueueFlagBits flag;
+	bool exists;
+	uint32_t index;
+} PVulkanQueueFamilyInfo;
+
+/**
+ * PVulkanRequest
+ *
+ * This struct is used to create a new window with the requested settings
+ */
+typedef struct {
+	bool debug;
+
+	// required vulkan features
+	VkQueueFlags required_queue_flags;
+	VkPhysicalDeviceFeatures required_features;
+	EDynarr *required_extensions; // Names of required extensions
+
+	// optional vulkan features
+	VkQueueFlags optional_queue_flags;
+	VkPhysicalDeviceFeatures optional_features;
+	EDynarr *optional_extensions; // Names of optional extensions
+} PVulkanRequest;
 
 /**
  * PVulkanData
  *
  * This struct contains data relevant to vulkan
  */
-struct PVulkanData {
+typedef struct{
 	VkInstance instance;
 	VkDebugUtilsMessengerEXT debug_messenger;
 	EDynarr *compatible_devices;
 	VkPhysicalDevice current_physical_device;
 
-	PVulkanQueueFamilyInfo graphics_queue_family;
-};
-
+	EDynarr *queue_family_info; // holds type PVulkanQueueFamilyInfo*
+} PVulkanData;
 
 /**
  * PAppInstance
  *
  * This struct is the holds all the information for the app for a GUI to work properly
  */
-struct PAppInstance {
+typedef struct {
 	EDynarr *window_settings; // Array of (PWindowSettings *)
 	PDeviceManager *input_manager;
 	EMutex *window_mutex;
-	PVulkanData * vulkan_data;
-};
+	PVulkanData *vulkan_data;
+} PAppInstance;
 
 
 // Vulkan
-PVulkanData *p_vulkan_init(void);
+PVulkanData *p_vulkan_init(PVulkanRequest *vulkan_request);
 void p_vulkan_deinit(PVulkanData *vulkan_data);
+void p_vulkan_init_request(PVulkanRequest *vulkan_request);
+void p_vulkan_deinit_request(PVulkanRequest *vulkan_request);
 void p_vulkan_list_available_extensions(void);
+PHANTOM_API void p_vulkan_set_device(PVulkanData *vulkan_data, PVulkanRequest *vulkan_request,
+		VkPhysicalDevice physical_device);
+
 
 
 // X11 systems

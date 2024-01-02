@@ -26,7 +26,11 @@ PHANTOM_API PAppInstance *p_linux_app_init(void)
 	app_instance->input_manager = p_event_init();
 
 	// create the vulkan instance
-	app_instance->vulkan_data = p_vulkan_init();
+	PVulkanRequest *vulkan_request = malloc(sizeof *vulkan_request);
+	p_vulkan_init_request(vulkan_request);
+	app_instance->vulkan_data = p_vulkan_init(vulkan_request);
+	p_vulkan_deinit_request(vulkan_request);
+	free(vulkan_request);
 
 	return app_instance;
 }
