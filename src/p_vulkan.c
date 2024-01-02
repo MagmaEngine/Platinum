@@ -43,6 +43,13 @@ void p_vulkan_init_request(PVulkanRequest *vulkan_request)
 #ifdef PHANTOM_DEBUG_VULKAN
 	e_dynarr_add(vulkan_request->required_extensions, E_VOID_PTR_FROM_VALUE(char *, VK_EXT_DEBUG_UTILS_EXTENSION_NAME));
 #endif // PHANTOM_DEBUG_VULKAN
+
+	// layers
+	vulkan_request->required_layers = e_dynarr_init(sizeof(char *), 1);
+#ifdef PHANTOM_DEBUG_VULKAN
+	e_dynarr_add(vulkan_request->required_layers, E_VOID_PTR_FROM_VALUE(char *, "VK_LAYER_KHRONOS_validation"));
+#endif // PHANTOM_DEBUG_VULKAN
+	vulkan_request->optional_layers = e_dynarr_init(sizeof(char *), 1);
 }
 
 /**
@@ -53,28 +60,9 @@ void p_vulkan_init_request(PVulkanRequest *vulkan_request)
 void p_vulkan_deinit_request(PVulkanRequest *vulkan_request)
 {
 	e_dynarr_deinit(vulkan_request->required_extensions);
+	e_dynarr_deinit(vulkan_request->required_layers);
 	e_dynarr_deinit(vulkan_request->optional_extensions);
-}
-
-/**
- * p_vulkan_list_available_extensions
- *
- * lists the extensions available on vulkan
- */
-void p_vulkan_list_available_extensions(void)
-{
-	// Check availible extensions
-	uint32_t vulkan_available_extension_count;
-	vkEnumerateInstanceExtensionProperties(NULL, &vulkan_available_extension_count, NULL);
-	e_log_message(E_LOG_INFO, L"Vulkan General", L"Number of extensions: %i", vulkan_available_extension_count);
-
-	VkExtensionProperties *vulkan_available_extensions = malloc(vulkan_available_extension_count *
-			sizeof(VkExtensionProperties));
-	vkEnumerateInstanceExtensionProperties(NULL, &vulkan_available_extension_count, vulkan_available_extensions);
-	for (uint32_t i = 0; i < vulkan_available_extension_count; i++)
-		e_log_message(E_LOG_DEBUG, L"Vulkan General", L"Supported extension: %s",
-				vulkan_available_extensions[i].extensionName);
-	free(vulkan_available_extensions);
+	e_dynarr_deinit(vulkan_request->optional_layers);
 }
 
 /**
@@ -99,6 +87,50 @@ bool p_vulkan_extension_exists(char *vulkan_extension)
 		}
 	}
 	return false;
+}
+
+/**
+ * p_vulkan_layer_exists
+ *
+ * returns true if the vulkan_layer is found
+ */
+bool p_vulkan_layer_exists(char *vulkan_layer)
+{
+	// Check availible layers
+	uint32_t vulkan_available_layer_count;
+	vkEnumerateInstanceLayerProperties(&vulkan_available_layer_count, NULL);
+	VkLayerProperties *vulkan_available_layers = malloc(vulkan_available_layer_count * sizeof(VkLayerProperties));
+	vkEnumerateInstanceLayerProperties(&vulkan_available_layer_count, vulkan_available_layers);
+	for (uint32_t i = 0; i < vulkan_available_layer_count; i++)
+	{
+		if (strcmp(vulkan_layer, vulkan_available_layers[i].layerName))
+		{
+			free(vulkan_available_layers);
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
+ * p_vulkan_list_available_extensions
+ *
+ * lists the extensions available on vulkan
+ */
+void p_vulkan_list_available_extensions(void)
+{
+	// Check availible extensions
+	uint32_t vulkan_available_extension_count;
+	vkEnumerateInstanceExtensionProperties(NULL, &vulkan_available_extension_count, NULL);
+	e_log_message(E_LOG_INFO, L"Vulkan General", L"Number of extensions: %i", vulkan_available_extension_count);
+
+	VkExtensionProperties *vulkan_available_extensions = malloc(vulkan_available_extension_count *
+			sizeof(VkExtensionProperties));
+	vkEnumerateInstanceExtensionProperties(NULL, &vulkan_available_extension_count, vulkan_available_extensions);
+	for (uint32_t i = 0; i < vulkan_available_extension_count; i++)
+		e_log_message(E_LOG_DEBUG, L"Vulkan General", L"Supported extension: %s",
+				vulkan_available_extensions[i].extensionName);
+	free(vulkan_available_extensions);
 }
 
 /**
@@ -135,40 +167,6 @@ void p_vulkan_list_available_layers(void)
 
 	for (uint32_t i = 0; i < vulkan_available_layer_count; i++) {
 		e_log_message(E_LOG_DEBUG, L"Vulkan General", L"Supported layers: %s", vulkan_available_layers[i].layerName);
-	}
-	free(vulkan_available_layers);
-}
-
-/**
- * p_vulkan_check_validation_layers
- *
- * should only be called when PHANTOM_DEBUG_VULKAN is set.
- * it checks if the desired validation layers exist
- * if not it returns an error
- */
-static void p_vulkan_check_validation_layers(const char *const vulkan_enabled_layers[], uint vulkan_enabled_layer_count)
-{
-	p_vulkan_list_available_layers();
-
-	uint32_t vulkan_available_layer_count;
-	vkEnumerateInstanceLayerProperties(&vulkan_available_layer_count, NULL);
-	VkLayerProperties *vulkan_available_layers = malloc(vulkan_available_layer_count *
-			sizeof(*vulkan_available_layers));
-	vkEnumerateInstanceLayerProperties(&vulkan_available_layer_count, vulkan_available_layers);
-
-	// Check if layer exists
-	for (uint i = 0; i < vulkan_enabled_layer_count; i++) {
-		bool layer_found = false;
-		for (uint j = 0; j < vulkan_available_layer_count; j++) {
-			if (strcmp(vulkan_enabled_layers[i], vulkan_available_layers[j].layerName) == 0) {
-				layer_found = true;
-				break;
-			}
-		}
-		if (!layer_found) {
-			e_log_message(E_LOG_ERROR, L"Vulkan General", L"Validation layer %s not found", vulkan_enabled_layers[i]);
-			exit(1);
-		}
 	}
 	free(vulkan_available_layers);
 }
@@ -268,19 +266,8 @@ static void p_vulkan_destroy_debug_utils_messenger(
  *
  * creates a VkDebugUtilsMessengerCreateInfoEXT and adds it to the vk_instance_create_info
  */
-static VkDebugUtilsMessengerCreateInfoEXT p_vulkan_init_debug_messenger(VkInstanceCreateInfo *vk_instance_create_info)
+static VkDebugUtilsMessengerCreateInfoEXT p_vulkan_init_debug_messenger(void)
 {
-	// vulkan layers to use
-	// Final entry being NULL enables the sizeof trick to check array size
-	const char *const vulkan_enabled_layers[] = {
-		"VK_LAYER_KHRONOS_validation",
-		NULL};
-	uint vulkan_enabled_layer_count = sizeof(vulkan_enabled_layers) / sizeof(vulkan_enabled_layers[0]) - 1;
-	p_vulkan_check_validation_layers(vulkan_enabled_layers, vulkan_enabled_layer_count);
-
-	vk_instance_create_info->enabledLayerCount = vulkan_enabled_layer_count;
-	vk_instance_create_info->ppEnabledLayerNames = vulkan_enabled_layers;
-
 	// create vulkan debug messenger
 	VkDebugUtilsMessengerCreateInfoEXT vk_debug_utils_messenger_create_info;
 	vk_debug_utils_messenger_create_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
@@ -295,7 +282,6 @@ static VkDebugUtilsMessengerCreateInfoEXT p_vulkan_init_debug_messenger(VkInstan
 		VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 	vk_debug_utils_messenger_create_info.pfnUserCallback = _vulkan_debug_callback;
 	vk_debug_utils_messenger_create_info.pUserData = NULL;
-	vk_instance_create_info->pNext = (VkDebugUtilsMessengerCreateInfoEXT*) &vk_debug_utils_messenger_create_info;
 	return vk_debug_utils_messenger_create_info;
 }
 
@@ -509,6 +495,64 @@ VkQueueFlags p_vulkan_enable_queue_flags(PVulkanRequest *vulkan_request, VkPhysi
 }
 
 /**
+ * p_vulkan_enable_extensions
+ *
+ * returns the required and optional extensions that exist
+ * if a required extension does not exist it returns 0
+ */
+EDynarr *p_vulkan_enable_extensions(PVulkanRequest *vulkan_request)
+{
+	EDynarr *enabled_extensions = e_dynarr_init(sizeof (char *), vulkan_request->required_extensions->num_items);
+	for (uint i = 0; i < vulkan_request->required_extensions->num_items; i++)
+	{
+		char *extension = E_DYNARR_GET(vulkan_request->required_extensions, char *, i);
+		if(p_vulkan_extension_exists(extension))
+			e_dynarr_add(enabled_extensions, E_VOID_PTR_FROM_VALUE(char *, extension));
+		else
+		{
+			e_log_message(E_LOG_ERROR, L"Vulkan General", L"Required extension \"%s\" does not exist!", extension);
+			exit(1);
+		}
+	}
+	for (uint i = 0; i < vulkan_request->optional_extensions->num_items; i++)
+	{
+		char *extension = E_DYNARR_GET(vulkan_request->optional_extensions, char *, i);
+		if(p_vulkan_extension_exists(extension))
+			e_dynarr_add(enabled_extensions, E_VOID_PTR_FROM_VALUE(char *, extension));
+	}
+	return enabled_extensions;
+}
+
+/**
+ * p_vulkan_enable_layers
+ *
+ * returns the required and optional layers that exist
+ * if a required layer does not exist it returns 0
+ */
+EDynarr *p_vulkan_enable_layers(PVulkanRequest *vulkan_request)
+{
+	EDynarr *enabled_layers = e_dynarr_init(sizeof (char *), vulkan_request->required_layers->num_items);
+	for (uint i = 0; i < vulkan_request->required_layers->num_items; i++)
+	{
+		char *layer = E_DYNARR_GET(vulkan_request->required_layers, char *, i);
+		if(p_vulkan_layer_exists(layer))
+			e_dynarr_add(enabled_layers, E_VOID_PTR_FROM_VALUE(char *,layer));
+		else
+		{
+			e_log_message(E_LOG_ERROR, L"Vulkan General", L"Required layer \"%s\" does not exist!", layer);
+			exit(1);
+		}
+	}
+	for (uint i = 0; i < vulkan_request->optional_layers->num_items; i++)
+	{
+		char *layer = E_DYNARR_GET(vulkan_request->optional_layers, char *, i);
+		if(p_vulkan_layer_exists(layer))
+			e_dynarr_add(enabled_layers, E_VOID_PTR_FROM_VALUE(char *,layer));
+	}
+	return enabled_layers;
+}
+
+/**
  * p_vulkan_set_device
  *
  * sets the physical device to use in vulkan_data from physical_device
@@ -540,24 +584,72 @@ PHANTOM_API void p_vulkan_set_device(PVulkanData *vulkan_data, PVulkanRequest *v
 			PVulkanQueueFamilyInfo temp_queue_family_info = p_vulkan_find_queue_family_info(physical_device, flag);
 			memcpy(queue_family_info, &temp_queue_family_info, sizeof temp_queue_family_info);
 			e_dynarr_add(vulkan_data->queue_family_info, queue_family_info);
+
 			free(queue_family_info);
 		}
 	}
 	uint num_queue_families = vulkan_data->queue_family_info->num_items;
 	VkDeviceQueueCreateInfo queue_create_infos[num_queue_families];
+	memset(queue_create_infos, 0, sizeof queue_create_infos);
 	for (uint i = 0; i < vulkan_data->queue_family_info->num_items; i++)
 	{
 		queue_create_infos[i].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-		queue_create_infos[i].queueFamilyIndex = E_DYNARR_GET(vulkan_data->queue_family_info, PVulkanQueueFamilyInfo, i).index;
+
+		queue_create_infos[i].queueFamilyIndex = E_DYNARR_GET(vulkan_data->queue_family_info, PVulkanQueueFamilyInfo, i)
+			.index;
 		queue_create_infos[i].queueCount = 1;
 		queue_create_infos[i].pQueuePriorities = E_PTR_FROM_VALUE(float, 1.f);
 	}
 
+	// Set device features
+	VkPhysicalDeviceFeatures device_features  = p_vulkan_enable_features(vulkan_request, physical_device);
 
-	// TODO: finish me
-	VkPhysicalDeviceFeatures device_features;
+	// Create logical device
 	VkDeviceCreateInfo device_create_info;
 	device_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+	device_create_info.pQueueCreateInfos = queue_create_infos;
+	device_create_info.queueCreateInfoCount = num_queue_families;
+	device_create_info.pEnabledFeatures = &device_features;
+
+	// TODO: make extensions work
+	//EDynarr *enabled_extensions = p_vulkan_enable_extensions(vulkan_request);
+	//device_create_info.enabledExtensionCount = enabled_extensions->num_items;
+	//device_create_info.ppEnabledExtensionNames = enabled_extensions->arr;
+	device_create_info.enabledExtensionCount = 0;
+	device_create_info.ppEnabledExtensionNames = NULL;
+
+	EDynarr *enabled_layers = p_vulkan_enable_layers(vulkan_request);
+	device_create_info.enabledLayerCount = enabled_layers->num_items;
+	device_create_info.ppEnabledLayerNames = enabled_layers->arr;
+
+	if (vkCreateDevice(physical_device, &device_create_info, NULL, &vulkan_data->logical_device) != VK_SUCCESS)
+	{
+		e_log_message(E_LOG_ERROR, L"Vulkan General", L"Failed to create logical device!");
+		exit(1);
+	}
+
+	//e_dynarr_deinit(enabled_extensions);
+	e_dynarr_deinit(enabled_layers);
+
+	// Set queue handles
+	if (vulkan_data->queue_handles != NULL)
+		e_dynarr_deinit(vulkan_data->queue_handles);
+	vulkan_data->queue_handles = e_dynarr_init(sizeof (PVulkanQueueHandle), 1);
+	for (VkQueueFlags flag = 1ULL; flag < VK_QUEUE_FLAG_BITS_MAX_ENUM; flag <<= 1)
+	{
+		if (flag & enabled_queue_flags)
+		{
+			PVulkanQueueFamilyInfo temp_queue_family_info = p_vulkan_find_queue_family_info(physical_device, flag);
+			VkQueue current_queue;
+			vkGetDeviceQueue(vulkan_data->logical_device, temp_queue_family_info.index, 0, &current_queue);
+
+			PVulkanQueueHandle queue_handle;
+			queue_handle.queue = current_queue;
+			queue_handle.flag = flag;
+			e_dynarr_add(vulkan_data->queue_handles, &queue_handle);
+		}
+	}
+
 }
 
 /**
@@ -587,7 +679,7 @@ static void p_vulkan_auto_pick_physical_device(PVulkanData *vulkan_data, PVulkan
 
 		// lots of score goes to discrete gpus
 		if (device_properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
-			score = 1000;
+			score = 10000;
 
 		// Maximum possible size of textures affects graphics quality
 		score += device_properties.limits.maxImageDimension2D;
@@ -714,9 +806,11 @@ PVulkanData *p_vulkan_init(PVulkanRequest *vulkan_request)
 {
 	PVulkanData *vulkan_data = malloc(sizeof *vulkan_data);
 	vulkan_data->queue_family_info = NULL;
+	vulkan_data->queue_handles = NULL;
 
 #ifdef PHANTOM_DEBUG_VULKAN
 	p_vulkan_list_available_extensions();
+	p_vulkan_list_available_layers();
 #endif // PHANTOM_DEBUG_VULKAN
 
 	// create vulkan instance
@@ -733,34 +827,31 @@ PVulkanData *p_vulkan_init(PVulkanRequest *vulkan_request)
 	vk_instance_create_info.pApplicationInfo = &vk_app_info;
 
 	// Add all required extensions and optional extensions that exist
-	EDynarr *enabled_extensions = e_dynarr_init_arr(sizeof (char *), vulkan_request->required_extensions->num_items,
-			vulkan_request->required_extensions->arr);
-	for (uint i = 0; i < vulkan_request->optional_extensions->num_items; i++)
-	{
-		char *extension = E_DYNARR_GET(vulkan_request->optional_extensions, char *, i);
-		if(p_vulkan_extension_exists(extension))
-			e_dynarr_add(enabled_extensions, extension);
-	}
-
+	EDynarr *enabled_extensions = p_vulkan_enable_extensions(vulkan_request);
 	vk_instance_create_info.enabledExtensionCount = enabled_extensions->num_items;
 	vk_instance_create_info.ppEnabledExtensionNames = enabled_extensions->arr;
 
+	EDynarr *enabled_layers = p_vulkan_enable_layers(vulkan_request);
+	vk_instance_create_info.enabledLayerCount = enabled_layers->num_items;
+	vk_instance_create_info.ppEnabledLayerNames = enabled_layers->arr;
+
 #ifdef PHANTOM_DEBUG_VULKAN
-	VkDebugUtilsMessengerCreateInfoEXT vk_debug_utils_messenger_create_info =
-		p_vulkan_init_debug_messenger(&vk_instance_create_info);
+	VkDebugUtilsMessengerCreateInfoEXT vk_debug_utils_messenger_create_info = p_vulkan_init_debug_messenger();
+	vk_instance_create_info.pNext = (VkDebugUtilsMessengerCreateInfoEXT*) &vk_debug_utils_messenger_create_info;
+#else
+	vk_instance_create_info.pNext = NULL;
+#endif // PHANTOM_DEBUG_VULKAN
+
 	p_vulkan_create_instance(vulkan_data, vk_instance_create_info);
 	e_dynarr_deinit(enabled_extensions);
+	e_dynarr_deinit(enabled_layers);
 
+#ifdef PHANTOM_DEBUG_VULKAN
 	if (p_vulkan_create_debug_utils_messenger(vulkan_data->instance, &vk_debug_utils_messenger_create_info, NULL,
 				&vulkan_data->debug_messenger) != VK_SUCCESS) {
 		e_log_message(E_LOG_ERROR, L"Vulkan General", L"Failed to set up debug messenger!");
 		exit(1);
 	}
-#else
-	vk_instance_create_info.enabledLayerCount = 0;
-	vk_instance_create_info.pNext = NULL;
-	p_vulkan_create_instance(vulkan_data, vk_instance_create_info);
-	e_dynarr_deinit(enabled_extensions);
 #endif // PHANTOM_DEBUG_VULKAN
 
 	p_vulkan_auto_pick_physical_device(vulkan_data, vulkan_request);
@@ -779,8 +870,11 @@ void p_vulkan_deinit(PVulkanData *vulkan_data)
 	p_vulkan_destroy_debug_utils_messenger(vulkan_data->instance, vulkan_data->debug_messenger, NULL);
 #endif // PHANTOM_DEBUG_VULKAN
 
-	e_dynarr_deinit(vulkan_data->queue_family_info);
 	e_dynarr_deinit(vulkan_data->compatible_devices);
+	e_dynarr_deinit(vulkan_data->queue_family_info);
+	e_dynarr_deinit(vulkan_data->queue_handles);
+
+	vkDestroyDevice(vulkan_data->logical_device, NULL);
 	vkDestroyInstance(vulkan_data->instance, NULL);
 	free(vulkan_data);
 }

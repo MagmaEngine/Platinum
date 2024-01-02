@@ -122,6 +122,16 @@ typedef struct {
 } PVulkanQueueFamilyInfo;
 
 /**
+ * PVulkanQueueHandles
+ *
+ * This struct is used to store information about the queue family
+ */
+typedef struct {
+	VkQueueFlagBits flag;
+	VkQueue queue;
+} PVulkanQueueHandle;
+
+/**
  * PVulkanRequest
  *
  * This struct is used to create a new window with the requested settings
@@ -133,11 +143,13 @@ typedef struct {
 	VkQueueFlags required_queue_flags;
 	VkPhysicalDeviceFeatures required_features;
 	EDynarr *required_extensions; // Names of required extensions
+	EDynarr *required_layers; // Names of required layers
 
 	// optional vulkan features
 	VkQueueFlags optional_queue_flags;
 	VkPhysicalDeviceFeatures optional_features;
 	EDynarr *optional_extensions; // Names of optional extensions
+	EDynarr *optional_layers; // Names of optional layers
 } PVulkanRequest;
 
 /**
@@ -148,10 +160,11 @@ typedef struct {
 typedef struct{
 	VkInstance instance;
 	VkDebugUtilsMessengerEXT debug_messenger;
-	EDynarr *compatible_devices;
 	VkPhysicalDevice current_physical_device;
-
+	VkDevice logical_device;
+	EDynarr *compatible_devices;
 	EDynarr *queue_family_info; // holds type PVulkanQueueFamilyInfo*
+	EDynarr *queue_handles; // holds type PVulkanQueueHandle
 } PVulkanData;
 
 /**
