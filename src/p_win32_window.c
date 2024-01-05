@@ -3,7 +3,7 @@
 
 static HANDLE window_creation_event;
 
-static void _win32_window_close(PAppInstance *app_instance, PWindowSettings *window_settings);
+static void _win32_window_close(PAppInstance *app_instance, PWindowData *window_data);
 
 /**
  * WindowProc
@@ -15,14 +15,14 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 	void *window_data = (void *)GetWindowLongPtr(hwnd, GWLP_USERDATA);
 
 	PAppInstance *app_instance;
-	PWindowSettings *window_settings;
+	PWindowData *window_data;
 
 	if (window_data == NULL)
 	{
 		e_log_message(E_LOG_WARNING, L"Phantom", L"Window Data not associated yet.");
 		return DefWindowProc(hwnd, uMsg, wParam, lParam);
 	} else {
-		window_settings = *(PWindowSettings **)&((char *)window_data)[sizeof (PAppInstance **)];
+		window_data = *(PWindowData **)&((char *)window_data)[sizeof (PAppInstance **)];
 		app_instance = ((PAppInstance **)window_data)[0];
 	}
 
@@ -32,8 +32,8 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 		case WM_ERASEBKGND:
 		{
 			e_log_message(E_LOG_DEBUG, L"Phantom", L"Erase Background Event triggered.");
-			if (window_settings->event_calls->enable_expose && window_settings->event_calls->expose != NULL)
-				window_settings->event_calls->expose();
+			if (window_data->event_calls->enable_expose && window_data->event_calls->expose != NULL)
+				window_data->event_calls->expose();
 			// Handle erase background message to avoid flickering
 			return 1;
 		}
@@ -47,10 +47,10 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 			SetBkColor(hdc, RGB(0, 0, 0));
 
 			// Fill the background with the black brush
-			FillRect(hdc, &ps.rcPaint, window_settings->display_info->hBrush);
+			FillRect(hdc, &ps.rcPaint, window_data->display_info->hBrush);
 			EndPaint(hwnd, &ps);
-			if (window_settings->event_calls->enable_expose && window_settings->event_calls->expose != NULL)
-				window_settings->event_calls->expose();
+			if (window_data->event_calls->enable_expose && window_data->event_calls->expose != NULL)
+				window_data->event_calls->expose();
 			return 0;
 		}
 
@@ -58,19 +58,19 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 		case WM_DISPLAYCHANGE:
 		{
 			e_log_message(E_LOG_DEBUG, L"Phantom", L"Display Change Event triggered.");
-			window_settings->display_info->screen_width = GetSystemMetrics(SM_CXSCREEN);
-			window_settings->display_info->screen_height = GetSystemMetrics(SM_CYSCREEN);
-			if (window_settings->event_calls->enable_configure && window_settings->event_calls->configure != NULL)
-				window_settings->event_calls->configure();
+			window_data->display_info->screen_width = GetSystemMetrics(SM_CXSCREEN);
+			window_data->display_info->screen_height = GetSystemMetrics(SM_CYSCREEN);
+			if (window_data->event_calls->enable_configure && window_data->event_calls->configure != NULL)
+				window_data->event_calls->configure();
 			return 0;
 		}
 		case WM_SIZE:
 		{
 			e_log_message(E_LOG_DEBUG, L"Phantom", L"Size Event triggered.");
-			window_settings->width = LOWORD(lParam);
-			window_settings->height = HIWORD(lParam);
-			if (window_settings->event_calls->enable_configure && window_settings->event_calls->configure != NULL)
-				window_settings->event_calls->configure();
+			window_data->width = LOWORD(lParam);
+			window_data->height = HIWORD(lParam);
+			if (window_data->event_calls->enable_configure && window_data->event_calls->configure != NULL)
+				window_data->event_calls->configure();
 			InvalidateRect(hwnd, NULL, TRUE);
 			return 0;
 		}
@@ -80,13 +80,13 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 			RECT windowRect;
 			GetWindowRect(hwnd, &windowRect);
 
-			window_settings->x = windowRect.left;
-			window_settings->y = windowRect.top;
+			window_data->x = windowRect.left;
+			window_data->y = windowRect.top;
 
 			InvalidateRect(hwnd, NULL, TRUE);
 
-			if (window_settings->event_calls->enable_configure && window_settings->event_calls->configure != NULL)
-				window_settings->event_calls->configure();
+			if (window_data->event_calls->enable_configure && window_data->event_calls->configure != NULL)
+				window_data->event_calls->configure();
 			return 0;
 		}
 
@@ -94,8 +94,8 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 		case WM_COPYDATA:
 		{
 			e_log_message(E_LOG_DEBUG, L"Phantom", L"Copy Data Event triggered.");
-			if (window_settings->event_calls->enable_client && window_settings->event_calls->client != NULL)
-				window_settings->event_calls->client();
+			if (window_data->event_calls->enable_client && window_data->event_calls->client != NULL)
+				window_data->event_calls->client();
 			return 0;
 		}
 
@@ -103,8 +103,8 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 		case WM_SETFOCUS:
 		{
 			e_log_message(E_LOG_DEBUG, L"Phantom", L"Set Focus Event triggered.");
-			if (window_settings->event_calls->enable_focus_in && window_settings->event_calls->focus_in != NULL)
-				window_settings->event_calls->focus_in();
+			if (window_data->event_calls->enable_focus_in && window_data->event_calls->focus_in != NULL)
+				window_data->event_calls->focus_in();
 			return 0;
 		}
 
@@ -112,8 +112,8 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 		case WM_KILLFOCUS:
 		{
 			e_log_message(E_LOG_DEBUG, L"Phantom", L"Kill Focus Event triggered.");
-			if (window_settings->event_calls->enable_focus_out && window_settings->event_calls->focus_out != NULL)
-				window_settings->event_calls->focus_out();
+			if (window_data->event_calls->enable_focus_out && window_data->event_calls->focus_out != NULL)
+				window_data->event_calls->focus_out();
 			return 0;
 		}
 
@@ -122,8 +122,8 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 		{
 			e_log_message(E_LOG_DEBUG, L"Phantom", L"Mouse Move Event triggered.");
 			// TODO: make the event only trigger on mouse enter
-			if (window_settings->event_calls->enable_enter && window_settings->event_calls->enter != NULL)
-				window_settings->event_calls->enter();
+			if (window_data->event_calls->enable_enter && window_data->event_calls->enter != NULL)
+				window_data->event_calls->enter();
 			return 0;
 		}
 
@@ -131,8 +131,8 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 		case WM_MOUSELEAVE:
 		{
 			e_log_message(E_LOG_DEBUG, L"Phantom", L"Mouse Leave Event triggered.");
-			if (window_settings->event_calls->enable_leave && window_settings->event_calls->leave != NULL)
-				window_settings->event_calls->leave();
+			if (window_data->event_calls->enable_leave && window_data->event_calls->leave != NULL)
+				window_data->event_calls->leave();
 			return 0;
 		}
 
@@ -140,15 +140,15 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 		case WM_DESTROY:
 		{
 			e_log_message(E_LOG_DEBUG, L"Phantom", L"Destroy Event triggered.");
-			DeleteObject(window_settings->display_info->hBrush);
-			if (window_settings->event_calls->enable_destroy && window_settings->event_calls->destroy != NULL)
-				window_settings->event_calls->destroy();
+			DeleteObject(window_data->display_info->hBrush);
+			if (window_data->event_calls->enable_destroy && window_data->event_calls->destroy != NULL)
+				window_data->event_calls->destroy();
 			PostQuitMessage(0);
 			e_mutex_lock(app_instance->window_mutex);
-			if (window_settings->status == P_WINDOW_STATUS_ALIVE)
-				window_settings->status = P_WINDOW_STATUS_CLOSE;
+			if (window_data->status == P_WINDOW_STATUS_ALIVE)
+				window_data->status = P_WINDOW_STATUS_CLOSE;
 			e_mutex_unlock(app_instance->window_mutex);
-			_win32_window_close(app_instance, window_settings);
+			_win32_window_close(app_instance, window_data);
 			return 0;
 		}
 
@@ -160,7 +160,7 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 /**
  * p_win32_window_set_dimensions
  *
- * updates window_settings with the values provided as x, y, width, and heigth
+ * updates window_data with the values provided as x, y, width, and heigth
  */
 PHANTOM_API void p_win32_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height)
 {
@@ -182,7 +182,7 @@ PHANTOM_API void p_win32_window_set_name(PDisplayInfo *display_info, const wchar
  * p_win32_window_create
  *
  * creates a window with parameters set from window_request.
- * returns a window_settings associated with the window.
+ * returns a window_data associated with the window.
  */
 PHANTOM_API void p_win32_window_create(PAppInstance *app_instance, const PWindowRequest window_request)
 {
@@ -193,19 +193,19 @@ PHANTOM_API void p_win32_window_create(PAppInstance *app_instance, const PWindow
 	display_info->hBrush = CreateSolidBrush(RGB(0, 0, 0));
 	display_info->class_name = L"PhantomWindowClass";
 
-	PWindowSettings *window_settings = malloc(sizeof *window_settings);
-	window_settings->name = malloc((wcslen(window_request.name)+1) * sizeof(wchar_t));
-	wcscpy(window_settings->name, window_request.name);
-	window_settings->x = e_mini(e_maxi(window_request.x, 0), display_info->screen_width);
-	window_settings->y = e_mini(e_maxi(window_request.y, 0), display_info->screen_height);
-	window_settings->width = e_mini(e_maxi(window_request.width, 1), display_info->screen_width);
-	window_settings->height = e_mini(e_maxi(window_request.height, 1), display_info->screen_height);
-	window_settings->display_type = window_request.display_type;
-	window_settings->interact_type = window_request.interact_type;
-	window_settings->display_info = display_info;
-	window_settings->event_calls = calloc(1, sizeof *window_settings->event_calls);
-	memcpy(window_settings->event_calls, &window_request.event_calls, sizeof *window_settings->event_calls);
-	window_settings->status = P_WINDOW_STATUS_ALIVE;
+	PWindowData *window_data = malloc(sizeof *window_data);
+	window_data->name = malloc((wcslen(window_request.name)+1) * sizeof(wchar_t));
+	wcscpy(window_data->name, window_request.name);
+	window_data->x = e_mini(e_maxi(window_request.x, 0), display_info->screen_width);
+	window_data->y = e_mini(e_maxi(window_request.y, 0), display_info->screen_height);
+	window_data->width = e_mini(e_maxi(window_request.width, 1), display_info->screen_width);
+	window_data->height = e_mini(e_maxi(window_request.height, 1), display_info->screen_height);
+	window_data->display_type = window_request.display_type;
+	window_data->interact_type = window_request.interact_type;
+	window_data->display_info = display_info;
+	window_data->event_calls = calloc(1, sizeof *window_data->event_calls);
+	memcpy(window_data->event_calls, &window_request.event_calls, sizeof *window_data->event_calls);
+	window_data->status = P_WINDOW_STATUS_ALIVE;
 
 	// Register the window class
 	WNDCLASS window_class = {0};
@@ -221,10 +221,10 @@ PHANTOM_API void p_win32_window_create(PAppInstance *app_instance, const PWindow
 	window_creation_event = CreateEvent(NULL, FALSE, FALSE, NULL);
 
 	// Start the window event manager
-	EThreadArguments args = malloc(sizeof (PAppInstance *) + sizeof (PWindowSettings *));
+	EThreadArguments args = malloc(sizeof (PAppInstance *) + sizeof (PWindowData *));
 	memcpy(args, &app_instance, sizeof (PAppInstance **));
-	memcpy(&((char *)args)[sizeof (PAppInstance **)], &window_settings, sizeof (PWindowSettings **));
-	window_settings->event_manager = e_thread_create(p_window_event_manage, args);
+	memcpy(&((char *)args)[sizeof (PAppInstance **)], &window_data, sizeof (PWindowData **));
+	window_data->event_manager = e_thread_create(p_window_event_manage, args);
 
 	DWORD result = WaitForSingleObject(window_creation_event, INFINITE);
 	if (result != WAIT_OBJECT_0)
@@ -241,14 +241,14 @@ PHANTOM_API void p_win32_window_create(PAppInstance *app_instance, const PWindow
  *
  * sends a signal to close the window and the event manager
  */
-PHANTOM_API void p_win32_window_close(PWindowSettings *window_settings)
+PHANTOM_API void p_win32_window_close(PWindowData *window_data)
 {
-	window_settings->status = P_WINDOW_STATUS_INTERNAL_CLOSE;
-	PDisplayInfo *display_info = window_settings->display_info;
+	window_data->status = P_WINDOW_STATUS_INTERNAL_CLOSE;
+	PDisplayInfo *display_info = window_data->display_info;
 	if (display_info->hwnd != NULL)
 		DestroyWindow(display_info->hwnd);
-	if (window_settings->event_manager != NULL)
-		CloseHandle(window_settings->event_manager);
+	if (window_data->event_manager != NULL)
+		CloseHandle(window_data->event_manager);
 }
 
 /**
@@ -256,25 +256,26 @@ PHANTOM_API void p_win32_window_close(PWindowSettings *window_settings)
  *
  * internal close function that actually closes the window and frees data
  */
-static void _win32_window_close(PAppInstance *app_instance, PWindowSettings *window_settings)
+static void _win32_window_close(PAppInstance *app_instance, PWindowData *window_data)
 {
 	// If window exists delete it.
 	e_mutex_lock(app_instance->window_mutex);
-	int index = e_dynarr_find(app_instance->window_settings, &window_settings);
+	int index = e_dynarr_find(app_instance->window_data, &window_data);
 	if (index == -1)
 	{
 		e_log_message(E_LOG_ERROR, L"Phantom", L"Window does not exist...");
 		exit(1);
 	}
-	free(window_settings->display_info);
-	if (window_settings->status == P_WINDOW_STATUS_CLOSE)
+	p_vulkan_surface_destroy(window_data->vulkan_display_data);
+	free(window_data->display_info);
+	if (window_data->status == P_WINDOW_STATUS_CLOSE)
 	{
-		free(window_settings->event_calls);
-		free(window_settings->name);
-		free(window_settings);
+		free(window_data->event_calls);
+		free(window_data->name);
+		free(window_data);
 		e_thread_detach(e_thread_self());
 	}
-	e_dynarr_remove_unordered(app_instance->window_settings, index);
+	e_dynarr_remove_unordered(app_instance->window_data, index);
 	e_mutex_unlock(app_instance->window_mutex);
 }
 
@@ -288,37 +289,37 @@ static void _win32_window_close(PAppInstance *app_instance, PWindowSettings *win
 static EThreadResult WINAPI p_win32_window_event_manage(EThreadArguments args)
 {
 	PAppInstance *app_instance = ((PAppInstance **)args)[0];
-	PWindowSettings *window_settings = *(PWindowSettings **)&((char *)args)[sizeof (PAppInstance **)];
-	window_settings->display_info->hwnd = CreateWindowEx(
+	PWindowData *window_data = *(PWindowData **)&((char *)args)[sizeof (PAppInstance **)];
+	window_data->display_info->hwnd = CreateWindowEx(
 			0,
-			window_settings->display_info->class_name,
-			window_settings->name,
+			window_data->display_info->class_name,
+			window_data->name,
 			WS_OVERLAPPEDWINDOW|WS_VISIBLE,
-			window_settings->x, window_settings->y, window_settings->width, window_settings->height,
+			window_data->x, window_data->y, window_data->width, window_data->height,
 			NULL,	  // Parent window
 			NULL,	  // Menu
-			window_settings->display_info->hInstance,
+			window_data->display_info->hInstance,
 			NULL);	 // Additional application data
 
-	if (window_settings->display_info->hwnd == NULL) {
+	if (window_data->display_info->hwnd == NULL) {
 		e_log_message(E_LOG_ERROR, L"Phantom", L"Cannot open window");
 		exit(1);
 	}
 
 	// Set display based on type
-	switch (window_settings->display_type)
+	switch (window_data->display_type)
 	{
 		case P_DISPLAY_WINDOWED:
-			p_window_windowed(window_settings, window_settings->x, window_settings->y, window_settings->width,
-					window_settings->height);
+			p_window_windowed(window_data, window_data->x, window_data->y, window_data->width,
+					window_data->height);
 		break;
 
 		case P_DISPLAY_DOCKED_FULLSCREEN:
-			p_window_docked_fullscreen(window_settings);
+			p_window_docked_fullscreen(window_data);
 		break;
 
 		case P_DISPLAY_FULLSCREEN:
-			p_window_fullscreen(window_settings);
+			p_window_fullscreen(window_data);
 		break;
 
 		case P_DISPLAY_MAX:
@@ -326,11 +327,15 @@ static EThreadResult WINAPI p_win32_window_event_manage(EThreadArguments args)
 			exit(1);
 	}
 
+	PVulkanDisplayRequest *vulkan_request_display = p_vulkan_request_display_create();
+	p_vulkan_surface_create(window_data, app_instance->vulkan_app_data, vulkan_request_display);
+	p_vulkan_request_display_destroy(vulkan_request_display);
+
 	e_mutex_lock(app_instance->window_mutex);
-	e_dynarr_add(app_instance->window_settings, &window_settings);
+	e_dynarr_add(app_instance->window_data, &window_data);
 	e_mutex_unlock(app_instance->window_mutex);
 
-	SetWindowLongPtr(window_settings->display_info->hwnd, GWLP_USERDATA, (LONG_PTR)args);
+	SetWindowLongPtr(window_data->display_info->hwnd, GWLP_USERDATA, (LONG_PTR)args);
 	SetEvent(window_creation_event);
 
 	MSG msg = {0};
@@ -342,16 +347,16 @@ static EThreadResult WINAPI p_win32_window_event_manage(EThreadArguments args)
 		DispatchMessage(&msg);
 	}
 	free(args);
-	p_win32_window_close(window_settings);
+	p_win32_window_close(window_data);
 	return 0;
 }
 
 /**
  * p_win32_window_fullscreen
  *
- * sets the window in window_settings to fullscreen
+ * sets the window in window_data to fullscreen
  */
-PHANTOM_API void p_win32_window_fullscreen(PWindowSettings *window_settings)
+PHANTOM_API void p_win32_window_fullscreen(PWindowData *window_data)
 {
 	DEVMODE devMode = {0};
 	devMode.dmSize = sizeof(DEVMODE);
@@ -359,56 +364,56 @@ PHANTOM_API void p_win32_window_fullscreen(PWindowSettings *window_settings)
 	devMode.dmPelsHeight = GetSystemMetrics(SM_CYSCREEN);
 	devMode.dmBitsPerPel = 32; // Adjust as needed
 	devMode.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT | DM_BITSPERPEL;
-	ShowWindow(window_settings->display_info->hwnd, SW_HIDE);
+	ShowWindow(window_data->display_info->hwnd, SW_HIDE);
 	if (ChangeDisplaySettings(&devMode, CDS_FULLSCREEN) == DISP_CHANGE_SUCCESSFUL)
 	{
-		SetWindowLong(window_settings->display_info->hwnd, GWL_STYLE, WS_POPUP);
-		SetWindowPos(window_settings->display_info->hwnd, HWND_TOP, 0, 0, devMode.dmPelsWidth, devMode.dmPelsHeight, SWP_FRAMECHANGED);
-		window_settings->display_type = P_DISPLAY_FULLSCREEN;
+		SetWindowLong(window_data->display_info->hwnd, GWL_STYLE, WS_POPUP);
+		SetWindowPos(window_data->display_info->hwnd, HWND_TOP, 0, 0, devMode.dmPelsWidth, devMode.dmPelsHeight, SWP_FRAMECHANGED);
+		window_data->display_type = P_DISPLAY_FULLSCREEN;
 	}
-	ShowWindow(window_settings->display_info->hwnd, SW_SHOWNORMAL);
-	UpdateWindow(window_settings->display_info->hwnd);
+	ShowWindow(window_data->display_info->hwnd, SW_SHOWNORMAL);
+	UpdateWindow(window_data->display_info->hwnd);
 }
 
 /**
  * p_win32_window_docked_fullscreen
  *
- * sets the window in window_settings to (borderless/windowed) fullscreen
+ * sets the window in window_data to (borderless/windowed) fullscreen
  */
-PHANTOM_API void p_win32_window_docked_fullscreen(PWindowSettings *window_settings)
+PHANTOM_API void p_win32_window_docked_fullscreen(PWindowData *window_data)
 {
-	if (window_settings->display_type == P_DISPLAY_FULLSCREEN)
+	if (window_data->display_type == P_DISPLAY_FULLSCREEN)
 	{
-		ShowWindow(window_settings->display_info->hwnd, SW_HIDE);
+		ShowWindow(window_data->display_info->hwnd, SW_HIDE);
 		if (ChangeDisplaySettings(NULL, 0) != DISP_CHANGE_SUCCESSFUL)
 			return;
 	}
-	SetWindowLong(window_settings->display_info->hwnd, GWL_STYLE,
-			GetWindowLong(window_settings->display_info->hwnd, GWL_STYLE) & ~WS_OVERLAPPEDWINDOW);
-	SetWindowPos(window_settings->display_info->hwnd, HWND_TOP, 0, 0, window_settings->display_info->screen_width,
-			window_settings->display_info->screen_height, SWP_FRAMECHANGED);
-	window_settings->display_type = P_DISPLAY_DOCKED_FULLSCREEN;
+	SetWindowLong(window_data->display_info->hwnd, GWL_STYLE,
+			GetWindowLong(window_data->display_info->hwnd, GWL_STYLE) & ~WS_OVERLAPPEDWINDOW);
+	SetWindowPos(window_data->display_info->hwnd, HWND_TOP, 0, 0, window_data->display_info->screen_width,
+			window_data->display_info->screen_height, SWP_FRAMECHANGED);
+	window_data->display_type = P_DISPLAY_DOCKED_FULLSCREEN;
 
-	ShowWindow(window_settings->display_info->hwnd, SW_SHOWNORMAL);
-	UpdateWindow(window_settings->display_info->hwnd);
+	ShowWindow(window_data->display_info->hwnd, SW_SHOWNORMAL);
+	UpdateWindow(window_data->display_info->hwnd);
 }
 
 /**
  * p_win32_window_windowed
  *
- * sets the window in window_settings to windowed mode and sets the dimensions
+ * sets the window in window_data to windowed mode and sets the dimensions
  */
-PHANTOM_API void p_win32_window_windowed(PWindowSettings *window_settings, uint x, uint y, uint width, uint height)
+PHANTOM_API void p_win32_window_windowed(PWindowData *window_data, uint x, uint y, uint width, uint height)
 {
-	if (window_settings->display_type == P_DISPLAY_FULLSCREEN)
+	if (window_data->display_type == P_DISPLAY_FULLSCREEN)
 	{
-		ShowWindow(window_settings->display_info->hwnd, SW_HIDE);
+		ShowWindow(window_data->display_info->hwnd, SW_HIDE);
 		if (ChangeDisplaySettings(NULL, 0) != DISP_CHANGE_SUCCESSFUL)
 			return;
 	}
-	SetWindowLong(window_settings->display_info->hwnd, GWL_STYLE, WS_OVERLAPPEDWINDOW);
-	SetWindowPos(window_settings->display_info->hwnd, HWND_TOP, x, y, width, height, SWP_FRAMECHANGED);
-	window_settings->display_type = P_DISPLAY_WINDOWED;
-	ShowWindow(window_settings->display_info->hwnd, SW_SHOWNORMAL);
-	UpdateWindow(window_settings->display_info->hwnd);
+	SetWindowLong(window_data->display_info->hwnd, GWL_STYLE, WS_OVERLAPPEDWINDOW);
+	SetWindowPos(window_data->display_info->hwnd, HWND_TOP, x, y, width, height, SWP_FRAMECHANGED);
+	window_data->display_type = P_DISPLAY_WINDOWED;
+	ShowWindow(window_data->display_info->hwnd, SW_SHOWNORMAL);
+	UpdateWindow(window_data->display_info->hwnd);
 }

@@ -49,6 +49,31 @@ typedef struct PDeviceManager PDeviceManager;
 typedef struct PDisplayInfo PDisplayInfo;
 
 /**
+ * PVulkanDisplayData
+ *
+ * This struct contains data relevant to a vulkan display
+ */
+typedef struct {
+	VkSurfaceKHR *surface;
+	VkPhysicalDevice current_physical_device;
+	VkDevice logical_device;
+	EDynarr *compatible_devices;
+	EDynarr *queue_family_info; // holds type PVulkanQueueFamilyInfo*
+	EDynarr *queue_handles; // holds type PVulkanQueueHandle
+	VkInstance *instance; // non-malloced pointer to PVulkanAppData->instance
+} PVulkanDisplayData;
+
+/**
+ * PVulkanAppData
+ *
+ * This struct is the holds all the information for the app for vulkan to work properly
+ */
+typedef struct {
+	VkInstance instance;
+	VkDebugUtilsMessengerEXT debug_messenger;
+} PVulkanAppData;
+
+/**
  * PEventCalls
  *
  * This struct is used to set user-based functionality onto events from the window manager
@@ -75,9 +100,9 @@ typedef struct {
 } PEventCalls;
 
 /**
- * PWindowSettings
+ * PWindowData
  *
- * This struct acts as a status showing the window's current settings
+ * This struct acts as a status showing the window's current data and settings
  * Values here should never be set directly
  */
 typedef struct {
@@ -92,7 +117,8 @@ typedef struct {
 	EThread event_manager;
 	PEventCalls *event_calls;
 	PDisplayInfo *display_info;
-} PWindowSettings;
+	PVulkanDisplayData *vulkan_display_data;
+} PWindowData;
 
 /**
  * PWindowRequest
@@ -117,7 +143,8 @@ typedef struct {
  */
 typedef struct {
 	VkQueueFlagBits flag;
-	bool exists;
+	VkBool32 exists;
+	VkBool32 present_support;
 	uint32_t index;
 } PVulkanQueueFamilyInfo;
 
@@ -132,12 +159,29 @@ typedef struct {
 } PVulkanQueueHandle;
 
 /**
- * PVulkanRequest
+ * PVulkanAppRequest
  *
- * This struct is used to create a new window with the requested settings
+ * This struct is used to create a new vulkan app with the requested settings
  */
 typedef struct {
 	bool debug;
+
+	// required vulkan features
+	EDynarr *required_extensions; // Names of required extensions
+	EDynarr *required_layers; // Names of required layers
+
+	// optional vulkan features
+	EDynarr *optional_extensions; // Names of optional extensions
+	EDynarr *optional_layers; // Names of optional layers
+} PVulkanAppRequest;
+
+/**
+ * PVulkanDisplayRequest
+ *
+ * This struct is used to create a new window surface with the requested settings
+ */
+typedef struct {
+	VkBool32 require_present;
 
 	// required vulkan features
 	VkQueueFlags required_queue_flags;
@@ -150,22 +194,7 @@ typedef struct {
 	VkPhysicalDeviceFeatures optional_features;
 	EDynarr *optional_extensions; // Names of optional extensions
 	EDynarr *optional_layers; // Names of optional layers
-} PVulkanRequest;
-
-/**
- * PVulkanData
- *
- * This struct contains data relevant to vulkan
- */
-typedef struct{
-	VkInstance instance;
-	VkDebugUtilsMessengerEXT debug_messenger;
-	VkPhysicalDevice current_physical_device;
-	VkDevice logical_device;
-	EDynarr *compatible_devices;
-	EDynarr *queue_family_info; // holds type PVulkanQueueFamilyInfo*
-	EDynarr *queue_handles; // holds type PVulkanQueueHandle
-} PVulkanData;
+} PVulkanDisplayRequest;
 
 /**
  * PAppInstance
@@ -173,30 +202,43 @@ typedef struct{
  * This struct is the holds all the information for the app for a GUI to work properly
  */
 typedef struct {
-	EDynarr *window_settings; // Array of (PWindowSettings *)
+	EDynarr *window_data; // Array of (PWindowData *)
 	PDeviceManager *input_manager;
 	EMutex *window_mutex;
-	PVulkanData *vulkan_data;
+	PVulkanAppData *vulkan_app_data;
 } PAppInstance;
 
 
 // Vulkan
-PVulkanData *p_vulkan_init(PVulkanRequest *vulkan_request);
-void p_vulkan_deinit(PVulkanData *vulkan_data);
-void p_vulkan_init_request(PVulkanRequest *vulkan_request);
-void p_vulkan_deinit_request(PVulkanRequest *vulkan_request);
-void p_vulkan_list_available_extensions(void);
-PHANTOM_API void p_vulkan_set_device(PVulkanData *vulkan_data, PVulkanRequest *vulkan_request,
-		VkPhysicalDevice physical_device);
+PVulkanAppData *p_vulkan_init(PVulkanAppRequest *vulkan_request_app);
+void p_vulkan_deinit(PVulkanAppData *vulkan_app_data);
 
+PVulkanAppRequest *p_vulkan_request_app_create(void);
+PVulkanDisplayRequest *p_vulkan_request_display_create(void);
+void p_vulkan_request_app_destroy(PVulkanAppRequest *vulkan_request_app);
+void p_vulkan_request_display_destroy(PVulkanDisplayRequest *vulkan_request_display);
+
+void p_vulkan_surface_create(PWindowData *window_data, PVulkanAppData *vulkan_app_data,
+		PVulkanDisplayRequest *vulkan_request_display);
+void p_vulkan_surface_destroy(PVulkanDisplayData *vulkan_display_data);
+
+PHANTOM_API void p_vulkan_device_set(
+		PVulkanDisplayData *vulkan_display_data,
+		PVulkanDisplayRequest *vulkan_request_display,
+		VkPhysicalDevice physical_device,
+		VkSurfaceKHR *surface);
+
+PHANTOM_API void p_vulkan_device_auto_pick(
+		PVulkanDisplayData *vulkan_display_data,
+		PVulkanAppData *vulkan_app_data,
+		PVulkanDisplayRequest *vulkan_request_display,
+		VkSurfaceKHR *surface);
 
 
 // X11 systems
 #ifdef PHANTOM_DISPLAY_X11
 
 #include <xcb/xcb.h>
-
-// MUTEX for window-based operations
 
 /**
  * PAtomTypes
@@ -247,10 +289,10 @@ struct PDisplayInfo {
 #define p_window_set_name p_x11_window_set_name
 
 PHANTOM_API void p_x11_window_create(PAppInstance *app_instance, const PWindowRequest window_request);
-PHANTOM_API void p_x11_window_close(PWindowSettings *window_settings);
-PHANTOM_API void p_x11_window_fullscreen(PWindowSettings *window_settings);
-PHANTOM_API void p_x11_window_docked_fullscreen(PWindowSettings *window_settings);
-PHANTOM_API void p_x11_window_windowed(PWindowSettings *window_settings, uint x, uint y, uint width, uint height);
+PHANTOM_API void p_x11_window_close(PWindowData *window_data);
+PHANTOM_API void p_x11_window_fullscreen(PWindowData *window_data);
+PHANTOM_API void p_x11_window_docked_fullscreen(PWindowData *window_data);
+PHANTOM_API void p_x11_window_windowed(PWindowData *window_data, uint x, uint y, uint width, uint height);
 PHANTOM_API void p_x11_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height);
 PHANTOM_API void p_x11_window_set_name(PDisplayInfo *display_info, const wchar_t *name);
 
@@ -274,10 +316,10 @@ struct PDisplayInfo{
 #define p_window_set_name p_wayland_window_set_name
 
 PHANTOM_API void p_wayland_window_create(PAppInstance *app_instance, const PWindowRequest window_request);
-PHANTOM_API void p_wayland_window_close(PWindowSettings *window_settings);
-PHANTOM_API void p_wayland_window_fullscreen(PWindowSettings *window_settings);
-PHANTOM_API void p_wayland_window_docked_fullscreen(PWindowSettings *window_settings);
-PHANTOM_API void p_wayland_window_windowed(PWindowSettings *window_settings, uint x, uint y, uint width, uint height);
+PHANTOM_API void p_wayland_window_close(PWindowData *window_data);
+PHANTOM_API void p_wayland_window_fullscreen(PWindowData *window_data);
+PHANTOM_API void p_wayland_window_docked_fullscreen(PWindowData *window_data);
+PHANTOM_API void p_wayland_window_windowed(PWindowData *window_data, uint x, uint y, uint width, uint height);
 PHANTOM_API void p_wayland_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height);
 PHANTOM_API void p_wayland_window_set_name(PDisplayInfo *display_info, const wchar_t *name);
 
@@ -353,10 +395,10 @@ struct PDisplayInfo{
 #define p_window_set_name p_win32_window_set_name
 
 PHANTOM_API void p_win32_window_create(PAppInstance *app_instance, const PWindowRequest window_request);
-PHANTOM_API void p_win32_window_close(PWindowSettings *window_settings);
-PHANTOM_API void p_win32_window_fullscreen(PWindowSettings *window_settings);
-PHANTOM_API void p_win32_window_docked_fullscreen(PWindowSettings *window_settings);
-PHANTOM_API void p_win32_window_windowed(PWindowSettings *window_settings, uint x, uint y, uint width, uint height);
+PHANTOM_API void p_win32_window_close(PWindowData *window_data);
+PHANTOM_API void p_win32_window_fullscreen(PWindowData *window_data);
+PHANTOM_API void p_win32_window_docked_fullscreen(PWindowData *window_data);
+PHANTOM_API void p_win32_window_windowed(PWindowData *window_data, uint x, uint y, uint width, uint height);
 PHANTOM_API void p_win32_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height);
 PHANTOM_API void p_win32_window_set_name(PDisplayInfo *display_info, const wchar_t *name);
 
