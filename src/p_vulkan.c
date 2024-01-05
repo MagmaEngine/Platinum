@@ -59,6 +59,7 @@ PVulkanDisplayRequest *p_vulkan_request_display_create(void)
 	// extensions
 	vulkan_request_display->optional_extensions = e_dynarr_init(sizeof(char *), 1);
 	vulkan_request_display->required_extensions = e_dynarr_init(sizeof(char *), 3);
+	e_dynarr_add(vulkan_request_display->required_extensions, E_VOID_PTR_FROM_VALUE(char *, VK_KHR_SWAPCHAIN_EXTENSION_NAME));
 
 	// layers
 	vulkan_request_display->required_layers = e_dynarr_init(sizeof(char *), 1);
