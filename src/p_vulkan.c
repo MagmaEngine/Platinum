@@ -511,7 +511,7 @@ PVulkanQueueFamilyInfo p_vulkan_find_viable_queue_family_info(PVulkanDisplayRequ
 				sizeof queue_family_info);
 
 		// if present is required, only enable if present is supported
-		if (vulkan_request_display->require_present)
+		if (queue_flag == VK_QUEUE_GRAPHICS_BIT && vulkan_request_display->require_present)
 		{
 			VkBool32 present_supported = false;
 			vkGetPhysicalDeviceSurfaceSupportKHR(device, queue_family_info.index, *surface, &present_supported);
