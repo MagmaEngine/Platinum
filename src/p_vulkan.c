@@ -707,25 +707,40 @@ PHANTOM_API void p_vulkan_device_set(
 	device_create_info.enabledLayerCount = enabled_layers->num_items;
 	device_create_info.ppEnabledLayerNames = enabled_layers->arr;
 
+	// Set logical device queues
+	EDynarr *device_queue_create_infos = e_dynarr_init(sizeof (VkDeviceQueueCreateInfo), 1);
+	for (uint i = 0; i < vulkan_data_display->queue_family_info->num_items; i++)
+	{
+		VkDeviceQueueCreateInfo queue_create_info = {0};
+		queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		queue_create_info.queueFamilyIndex = E_DYNARR_GET(vulkan_data_display->queue_family_info,
+				PVulkanQueueFamilyInfo, i).index;
+		queue_create_info.queueCount = 1;
+		queue_create_info.pQueuePriorities = E_PTR_FROM_VALUE(float, 1.f);
+		e_dynarr_add(device_queue_create_infos, &queue_create_info);
+	}
+	device_create_info.queueCreateInfoCount = device_queue_create_infos->num_items;
+	device_create_info.pQueueCreateInfos = device_queue_create_infos->arr;
+
+	// create logical device
 	if (vkCreateDevice(physical_device, &device_create_info, NULL, &vulkan_data_display->logical_device) != VK_SUCCESS)
 	{
 		e_log_message(E_LOG_ERROR, L"Vulkan General", L"Failed to create logical device!");
 		exit(1);
 	}
+	e_dynarr_deinit(enabled_extensions);
+	e_dynarr_deinit(enabled_layers);
+	e_dynarr_deinit(device_queue_create_infos);
 
+	// Set queue handles
 	for (uint i = 0; i < vulkan_data_display->queue_family_info->num_items; i++)
 	{
 		PVulkanQueueFamilyInfo *queue_family_info =
 			&E_DYNARR_GET(vulkan_data_display->queue_family_info, PVulkanQueueFamilyInfo, i);
-
-		// Set queue handles
 		VkQueue vk_queue;
 		vkGetDeviceQueue(vulkan_data_display->logical_device, queue_family_info->index, i, &vk_queue);
 		queue_family_info->queue = vk_queue;
 	}
-
-	e_dynarr_deinit(enabled_extensions);
-	e_dynarr_deinit(enabled_layers);
 }
 
 /**
