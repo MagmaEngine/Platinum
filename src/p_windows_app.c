@@ -31,7 +31,7 @@ PHANTOM_API PAppInstance *p_windows_app_init(void)
 
 	// create the vulkan instance
 	PVulkanAppRequest *vulkan_request_app = p_vulkan_request_app_create();
-	app_instance->vulkan_app_data = p_vulkan_init(vulkan_request_app);
+	app_instance->vulkan_data_app = p_vulkan_init(vulkan_request_app);
 	p_vulkan_request_app_destroy(vulkan_request_app);
 
 	return app_instance;
@@ -59,7 +59,7 @@ PHANTOM_API void p_windows_app_deinit(PAppInstance *app_instance)
 	e_mutex_destroy(app_instance->window_mutex);
 
 	p_event_deinit(app_instance->input_manager);
-	p_vulkan_deinit(app_instance->vulkan_app_data);
+	p_vulkan_deinit(app_instance->vulkan_data_app);
 
 	free(app_instance->window_mutex);
 	free(app_instance);

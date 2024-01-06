@@ -275,7 +275,7 @@ PHANTOM_API void p_x11_window_create(PAppInstance *app_instance, const PWindowRe
 	}
 
 	PVulkanDisplayRequest *vulkan_request_display = p_vulkan_request_display_create();
-	p_vulkan_surface_create(window_data, app_instance->vulkan_app_data, vulkan_request_display);
+	p_vulkan_surface_create(window_data, app_instance->vulkan_data_app, vulkan_request_display);
 	p_vulkan_request_display_destroy(vulkan_request_display);
 
 	e_mutex_lock(app_instance->window_mutex);
@@ -318,7 +318,7 @@ static void _x11_window_close(PAppInstance *app_instance, PWindowData *window_da
 		exit(1);
 	}
 	PDisplayInfo *display_info = window_data->display_info;
-	p_vulkan_surface_destroy(window_data->vulkan_display_data);
+	p_vulkan_surface_destroy(window_data->vulkan_data_display);
 	xcb_unmap_window(display_info->connection, display_info->window);
 	xcb_disconnect(display_info->connection);
 	free(window_data->display_info);

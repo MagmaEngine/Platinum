@@ -49,7 +49,7 @@ typedef struct PDeviceManager PDeviceManager;
 typedef struct PDisplayInfo PDisplayInfo;
 
 /**
- * PVulkanDisplayData
+ * PVulkanDataDisplay
  *
  * This struct contains data relevant to a vulkan display
  */
@@ -59,19 +59,18 @@ typedef struct {
 	VkDevice logical_device;
 	EDynarr *compatible_devices;
 	EDynarr *queue_family_info; // holds type PVulkanQueueFamilyInfo*
-	EDynarr *queue_handles; // holds type PVulkanQueueHandle
-	VkInstance *instance; // non-malloced pointer to PVulkanAppData->instance
-} PVulkanDisplayData;
+	VkInstance *instance; // non-malloced pointer to PVulkanDataApp->instance
+} PVulkanDataDisplay;
 
 /**
- * PVulkanAppData
+ * PVulkanDataApp
  *
  * This struct is the holds all the information for the app for vulkan to work properly
  */
 typedef struct {
 	VkInstance instance;
 	VkDebugUtilsMessengerEXT debug_messenger;
-} PVulkanAppData;
+} PVulkanDataApp;
 
 /**
  * PEventCalls
@@ -117,7 +116,7 @@ typedef struct {
 	EThread event_manager;
 	PEventCalls *event_calls;
 	PDisplayInfo *display_info;
-	PVulkanDisplayData *vulkan_display_data;
+	PVulkanDataDisplay *vulkan_data_display;
 } PWindowData;
 
 /**
@@ -142,21 +141,11 @@ typedef struct {
  * This struct is used to store information about the queue family
  */
 typedef struct {
-	VkQueueFlagBits flag;
+	VkQueueFlags flags;
 	VkBool32 exists;
-	VkBool32 present_support;
 	uint32_t index;
-} PVulkanQueueFamilyInfo;
-
-/**
- * PVulkanQueueHandles
- *
- * This struct is used to store information about the queue family
- */
-typedef struct {
-	VkQueueFlagBits flag;
 	VkQueue queue;
-} PVulkanQueueHandle;
+} PVulkanQueueFamilyInfo;
 
 /**
  * PVulkanAppRequest
@@ -205,32 +194,32 @@ typedef struct {
 	EDynarr *window_data; // Array of (PWindowData *)
 	PDeviceManager *input_manager;
 	EMutex *window_mutex;
-	PVulkanAppData *vulkan_app_data;
+	PVulkanDataApp *vulkan_data_app;
 } PAppInstance;
 
 
 // Vulkan
-PVulkanAppData *p_vulkan_init(PVulkanAppRequest *vulkan_request_app);
-void p_vulkan_deinit(PVulkanAppData *vulkan_app_data);
+PVulkanDataApp *p_vulkan_init(PVulkanAppRequest *vulkan_request_app);
+void p_vulkan_deinit(PVulkanDataApp *vulkan_data_app);
 
 PVulkanAppRequest *p_vulkan_request_app_create(void);
 PVulkanDisplayRequest *p_vulkan_request_display_create(void);
 void p_vulkan_request_app_destroy(PVulkanAppRequest *vulkan_request_app);
 void p_vulkan_request_display_destroy(PVulkanDisplayRequest *vulkan_request_display);
 
-void p_vulkan_surface_create(PWindowData *window_data, PVulkanAppData *vulkan_app_data,
+void p_vulkan_surface_create(PWindowData *window_data, PVulkanDataApp *vulkan_data_app,
 		PVulkanDisplayRequest *vulkan_request_display);
-void p_vulkan_surface_destroy(PVulkanDisplayData *vulkan_display_data);
+void p_vulkan_surface_destroy(PVulkanDataDisplay *vulkan_data_display);
 
 PHANTOM_API void p_vulkan_device_set(
-		PVulkanDisplayData *vulkan_display_data,
+		PVulkanDataDisplay *vulkan_data_display,
 		PVulkanDisplayRequest *vulkan_request_display,
 		VkPhysicalDevice physical_device,
 		VkSurfaceKHR *surface);
 
 PHANTOM_API void p_vulkan_device_auto_pick(
-		PVulkanDisplayData *vulkan_display_data,
-		PVulkanAppData *vulkan_app_data,
+		PVulkanDataDisplay *vulkan_data_display,
+		PVulkanDataApp *vulkan_data_app,
 		PVulkanDisplayRequest *vulkan_request_display,
 		VkSurfaceKHR *surface);
 
