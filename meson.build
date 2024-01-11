@@ -3,14 +3,11 @@ phantom_srcs = [
       ]
 
 phantom_deps = [
-  dep_display,
   dep_libenigma,
-  dependency('vulkan', required : true),
+  dep_vulkan,
   ]
 
-phantom_c_args = [
-  '-D_PHANTOM_INTERNAL',
-  ]
+phantom_c_args = []
 
 ## Phantom build setup
 # Windows
@@ -30,6 +27,7 @@ elif host_machine.system() == 'linux'
     files('src/p_linux_events.c'),
     ]
   phantom_deps += [
+    dep_display,
     dependency('libevdev', required : true),
     dependency('libudev', required : true),
     ]
@@ -53,13 +51,24 @@ elif host_machine.system() == 'linux'
   endif
 endif
 
-libphantom = library(
-  'phantom',
-  sources: phantom_srcs,
-  dependencies: phantom_deps,
-  include_directories: include_directories('include'),
-  c_args : phantom_c_args,
-  install : false)
+if library_buildtype == 'shared'
+  phantom_c_args += '-D_PHANTOM_INTERNAL'
+  libphantom = shared_library(
+    'phantom',
+    sources: phantom_srcs,
+    dependencies: phantom_deps,
+    include_directories: include_directories('include'),
+    c_args : phantom_c_args,
+    install : true)
+elif library_buildtype == 'static'
+  libphantom = static_library(
+    'phantom',
+    sources: phantom_srcs,
+    dependencies: phantom_deps,
+    include_directories: include_directories('include'),
+    c_args : phantom_c_args,
+    install : true)
+endif
 
 dep_libphantom = declare_dependency(
   include_directories: include_directories('include'),

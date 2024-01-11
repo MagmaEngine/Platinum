@@ -4,6 +4,7 @@
 static HANDLE window_creation_event;
 
 static void _win32_window_close(PAppInstance *app_instance, PWindowData *window_data);
+static EThreadResult WINAPI p_win32_window_event_manage(EThreadArguments args);
 
 /**
  * WindowProc
@@ -12,18 +13,18 @@ static void _win32_window_close(PAppInstance *app_instance, PWindowData *window_
  */
 static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-	void *window_data = (void *)GetWindowLongPtr(hwnd, GWLP_USERDATA);
+	void *window_ptr_data = (void *)GetWindowLongPtr(hwnd, GWLP_USERDATA);
 
 	PAppInstance *app_instance;
 	PWindowData *window_data;
 
-	if (window_data == NULL)
+	if (window_ptr_data == NULL)
 	{
 		e_log_message(E_LOG_WARNING, L"Phantom", L"Window Data not associated yet.");
 		return DefWindowProc(hwnd, uMsg, wParam, lParam);
 	} else {
-		window_data = *(PWindowData **)&((char *)window_data)[sizeof (PAppInstance **)];
-		app_instance = ((PAppInstance **)window_data)[0];
+		window_data = *(PWindowData **)&((char *)window_ptr_data)[sizeof (PAppInstance **)];
+		app_instance = ((PAppInstance **)window_ptr_data)[0];
 	}
 
 	switch (uMsg)
@@ -194,8 +195,9 @@ PHANTOM_API void p_win32_window_create(PAppInstance *app_instance, const PWindow
 	display_info->class_name = L"PhantomWindowClass";
 
 	PWindowData *window_data = malloc(sizeof *window_data);
-	window_data->name = malloc((wcslen(window_request.name)+1) * sizeof(wchar_t));
-	wcscpy(window_data->name, window_request.name);
+	size_t name_size = (wcslen(window_request.name)) * sizeof(wchar_t);
+	window_data->name = malloc(name_size + sizeof(wchar_t));
+	wcscpy_s(window_data->name, name_size, window_request.name);
 	window_data->x = e_mini(e_maxi(window_request.x, 0), display_info->screen_width);
 	window_data->y = e_mini(e_maxi(window_request.y, 0), display_info->screen_height);
 	window_data->width = e_mini(e_maxi(window_request.width, 1), display_info->screen_width);
@@ -224,7 +226,7 @@ PHANTOM_API void p_win32_window_create(PAppInstance *app_instance, const PWindow
 	EThreadArguments args = malloc(sizeof (PAppInstance *) + sizeof (PWindowData *));
 	memcpy(args, &app_instance, sizeof (PAppInstance **));
 	memcpy(&((char *)args)[sizeof (PAppInstance **)], &window_data, sizeof (PWindowData **));
-	window_data->event_manager = e_thread_create(p_window_event_manage, args);
+	window_data->event_manager = e_thread_create(p_win32_window_event_manage, args);
 
 	DWORD result = WaitForSingleObject(window_creation_event, INFINITE);
 	if (result != WAIT_OBJECT_0)

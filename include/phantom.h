@@ -312,13 +312,6 @@ PHANTOM_API void p_wayland_window_windowed(PWindowData *window_data, uint x, uin
 PHANTOM_API void p_wayland_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height);
 PHANTOM_API void p_wayland_window_set_name(PDisplayInfo *display_info, const wchar_t *name);
 
-// Vulkan
-#define p_vulkan_init p_wayland_vulkan_init
-#define p_vulkan_deinit p_wayland_vulkan_deinit
-
-VkInstance *p_wayland_vulkan_init(void);
-void p_wayland_vulkan_deinit(VkInstance *vk_instance);
-
 #endif // PHANTOM_DISPLAY_WAYLAND
 
 
@@ -390,13 +383,6 @@ PHANTOM_API void p_win32_window_docked_fullscreen(PWindowData *window_data);
 PHANTOM_API void p_win32_window_windowed(PWindowData *window_data, uint x, uint y, uint width, uint height);
 PHANTOM_API void p_win32_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height);
 PHANTOM_API void p_win32_window_set_name(PDisplayInfo *display_info, const wchar_t *name);
-
-// Vulkan
-#define p_vulkan_init p_win32_vulkan_init
-#define p_vulkan_deinit p_win32_vulkan_deinit
-
-VkInstance *p_win32_vulkan_init(void);
-void p_win32_vulkan_deinit(VkInstance *vk_instance);
 
 #endif // PHANTOM_DISPLAY_WIN32
 

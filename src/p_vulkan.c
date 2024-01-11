@@ -927,9 +927,9 @@ PVulkanDataApp *p_vulkan_init(PVulkanAppRequest *vulkan_request_app)
 	VkApplicationInfo vk_app_info;
 	vk_app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 	vk_app_info.pApplicationName = "Phantom";
-	vk_app_info.applicationVersion = VK_MAKE_VERSION(0, 0, 1);
+	vk_app_info.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
 	vk_app_info.pEngineName = "No Engine";
-	vk_app_info.engineVersion = VK_MAKE_VERSION(0, 0, 1);
+	vk_app_info.engineVersion = VK_MAKE_VERSION(1, 0, 0);
 	vk_app_info.apiVersion = VK_API_VERSION_1_0;
 
 	VkInstanceCreateInfo vk_instance_create_info;
@@ -1016,9 +1016,9 @@ void p_vulkan_surface_create(PWindowData *window_data, PVulkanDataApp *vulkan_da
 #elif defined PHANTOM_DISPLAY_WIN32
 	VkWin32SurfaceCreateInfoKHR vk_surface_create_info;
 	vk_surface_create_info.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
-	vk_surface_create_info.hwnd = window_settings->display_info->hwnd;
-	vk_surface_create_info.hinstance = window_settings->display_info->hinstance;
-	if (vkCreateWin32SurfaceKHR(vulkan_data->instance, &vk_surface_create_info, NULL, window_settings->vulkan_surface)
+	vk_surface_create_info.hwnd = window_data->display_info->hwnd;
+	vk_surface_create_info.hinstance = window_data->display_info->hInstance;
+	if (vkCreateWin32SurfaceKHR(vulkan_data_app->instance, &vk_surface_create_info, NULL, vulkan_data_display->surface)
 			!= VK_SUCCESS)
 	{
 		e_log_message(E_LOG_ERROR, L"Vulkan General", L"Failed to create Win32 surface!");
