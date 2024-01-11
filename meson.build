@@ -3,6 +3,7 @@ phantom_srcs = [
       ]
 
 phantom_deps = [
+  dep_display,
   dep_libenigma,
   dependency('vulkan', required : true),
   ]
@@ -36,29 +37,20 @@ elif host_machine.system() == 'linux'
     '-fvisibility=hidden',
     ]
 # X11
-  if dep_x11[0].found() and dep_x11[1].found()
+  if display == 'x11'
     phantom_srcs += [
       files('src/p_x11_window.c'),
       ]
-    phantom_deps += dep_x11
-    phantom_c_args += [
-      '-DPHANTOM_DISPLAY_X11',
-      ]
 # Wayland
-  elif dep_wayland.found()
+  elif display == 'wayland'
     phantom_srcs += [
       files('src/p_wayland_window.c'),
       ]
-    phantom_deps += dep_wayland
-    phantom_c_args += [
-      '-DPHANTOM_DISPLAY_WAYLAND',
-      ]
-  elif dep_ncurses.found()
+  elif display == 'ncurses'
     message('TODO: implement me')
   else
     error('There must be at least one graphical back-end installed.')
   endif
-
 endif
 
 libphantom = library(

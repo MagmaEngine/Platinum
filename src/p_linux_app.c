@@ -1,6 +1,8 @@
 #include "phantom.h"
 #include <locale.h>
 
+EMutex debug_memory_mutex;
+
 /**
  * p_linux_app_init
  *
@@ -10,6 +12,9 @@
 PHANTOM_API PAppInstance *p_linux_app_init(void)
 {
 	setlocale(LC_ALL, "");
+
+	e_mutex_init(&debug_memory_mutex);
+	e_debug_memory_init(&debug_memory_mutex);
 
 	PAppInstance *app_instance = malloc(sizeof *app_instance);
 
@@ -58,4 +63,7 @@ PHANTOM_API void p_linux_app_deinit(PAppInstance *app_instance)
 
 	free(app_instance->window_mutex);
 	free(app_instance);
+
+	e_debug_mem_print(0);
+	e_mutex_destroy(&debug_memory_mutex);
 }

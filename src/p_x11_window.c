@@ -7,6 +7,9 @@
 
 static EThreadResult p_x11_window_event_manage(EThreadArguments args);
 
+// the pattern (free)(x) comes up a few times in this code. It is only used to bypass the memory debugger macros
+// which will error because the data is malloc'd in a library call instead of in-code
+
 /**
  * _resize_pixmap
  *
@@ -84,7 +87,7 @@ static xcb_atom_t p_x11_generate_atom(xcb_connection_t *connection, const char *
 		exit(1);
 	}
 	xcb_atom_t atom = reply->atom;
-	free(reply);
+	(free)(reply);
 	return atom;
 }
 
@@ -144,7 +147,6 @@ PHANTOM_API void p_x11_window_set_name(PDisplayInfo *display_info, const wchar_t
  */
 PHANTOM_API void p_x11_window_create(PAppInstance *app_instance, const PWindowRequest window_request)
 {
-	// Vulkan: TODO: Add vulkan surface
 	// Create an XCB connection and window
 	xcb_connection_t *connection = xcb_connect(NULL, NULL);
 
@@ -421,8 +423,8 @@ static EThreadResult p_x11_window_event_manage(EThreadArguments args)
 						is_normal |= (state_type[i] == display_info->atoms[P_ATOM_NET_WM_WINDOW_TYPE_NORMAL]);
 					}
 
-					free(property_reply_state);
-					free(property_reply_type);
+					(free)(property_reply_state);
+					(free)(property_reply_type);
 
 					if (is_fullscreen)
 						window_data->display_type = P_DISPLAY_FULLSCREEN;
@@ -494,7 +496,7 @@ static EThreadResult p_x11_window_event_manage(EThreadArguments args)
 				break;
 			}
 		}
-		free(event);
+		(free)(event);
 	}
 	free(args);
 	return NULL;

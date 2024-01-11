@@ -25,15 +25,19 @@ PVulkanAppRequest *p_vulkan_request_app_create(void)
 	vulkan_request_app->optional_extensions = e_dynarr_init(sizeof(char *), 1);
 
 	vulkan_request_app->required_extensions = e_dynarr_init(sizeof(char *), 3);
-	e_dynarr_add(vulkan_request_app->required_extensions, E_VOID_PTR_FROM_VALUE(char *, VK_KHR_SURFACE_EXTENSION_NAME));
+	e_dynarr_add(vulkan_request_app->required_extensions, E_VOID_PTR_FROM_VALUE(char *,
+				VK_KHR_SURFACE_EXTENSION_NAME));
 #ifdef PHANTOM_DISPLAY_X11
-	e_dynarr_add(vulkan_request_app->required_extensions, E_VOID_PTR_FROM_VALUE(char *, VK_KHR_XCB_SURFACE_EXTENSION_NAME));
+	e_dynarr_add(vulkan_request_app->required_extensions, E_VOID_PTR_FROM_VALUE(char *,
+				VK_KHR_XCB_SURFACE_EXTENSION_NAME));
 #endif // PHANTOM_DISPLAY_X11
 #ifdef PHANTOM_DISPLAY_WIN32
-	e_dynarr_add(vulkan_request_app->required_extensions, E_VOID_PTR_FROM_VALUE(char *, VK_KHR_WIN32_SURFACE_EXTENSION_NAME));
+	e_dynarr_add(vulkan_request_app->required_extensions, E_VOID_PTR_FROM_VALUE(char *,
+				VK_KHR_WIN32_SURFACE_EXTENSION_NAME));
 #endif // PHANTOM_DISPLAY_WIN32
 #ifdef PHANTOM_DEBUG_VULKAN
-	e_dynarr_add(vulkan_request_app->required_extensions, E_VOID_PTR_FROM_VALUE(char *, VK_EXT_DEBUG_UTILS_EXTENSION_NAME));
+	e_dynarr_add(vulkan_request_app->required_extensions, E_VOID_PTR_FROM_VALUE(char *,
+				VK_EXT_DEBUG_UTILS_EXTENSION_NAME));
 #endif // PHANTOM_DEBUG_VULKAN
 
 	// layers
@@ -59,12 +63,14 @@ PVulkanDisplayRequest *p_vulkan_request_display_create(void)
 	// extensions
 	vulkan_request_display->optional_extensions = e_dynarr_init(sizeof(char *), 1);
 	vulkan_request_display->required_extensions = e_dynarr_init(sizeof(char *), 3);
-	e_dynarr_add(vulkan_request_display->required_extensions, E_VOID_PTR_FROM_VALUE(char *, VK_KHR_SWAPCHAIN_EXTENSION_NAME));
+	e_dynarr_add(vulkan_request_display->required_extensions, E_VOID_PTR_FROM_VALUE(char *,
+				VK_KHR_SWAPCHAIN_EXTENSION_NAME));
 
 	// layers
 	vulkan_request_display->required_layers = e_dynarr_init(sizeof(char *), 1);
 #ifdef PHANTOM_DEBUG_VULKAN
-	e_dynarr_add(vulkan_request_display->required_layers, E_VOID_PTR_FROM_VALUE(char *, "VK_LAYER_KHRONOS_validation"));
+	e_dynarr_add(vulkan_request_display->required_layers, E_VOID_PTR_FROM_VALUE(char *,
+				"VK_LAYER_KHRONOS_validation"));
 #endif // PHANTOM_DEBUG_VULKAN
 	vulkan_request_display->optional_layers = e_dynarr_init(sizeof(char *), 1);
 
@@ -124,6 +130,7 @@ bool p_vulkan_extension_exists(char *vulkan_extension)
 			return true;
 		}
 	}
+	free(vulkan_available_extensions);
 	return false;
 }
 
@@ -147,6 +154,7 @@ bool p_vulkan_layer_exists(char *vulkan_layer)
 			return true;
 		}
 	}
+	free(vulkan_available_layers);
 	return false;
 }
 
@@ -497,8 +505,8 @@ VkPhysicalDeviceFeatures p_vulkan_enable_features(PVulkanDisplayRequest *vulkan_
  *
  * returns the first viable queue family info
  */
-PVulkanQueueFamilyInfo p_vulkan_find_viable_queue_family_info(PVulkanDisplayRequest *vulkan_request_display, VkPhysicalDevice device,
-		VkSurfaceKHR *surface, VkQueueFlagBits queue_flag)
+PVulkanQueueFamilyInfo p_vulkan_find_viable_queue_family_info(PVulkanDisplayRequest *vulkan_request_display,
+		VkPhysicalDevice device, VkSurfaceKHR *surface, VkQueueFlagBits queue_flag)
 {
 	// evaluate optional and required queue flags
 	EDynarr *queue_family_infos = p_vulkan_find_queue_family_infos(device, queue_flag);
@@ -681,7 +689,8 @@ PHANTOM_API void p_vulkan_device_set(
 	{
 		queue_create_infos[i].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
 
-		queue_create_infos[i].queueFamilyIndex = E_DYNARR_GET(vulkan_data_display->queue_family_info, PVulkanQueueFamilyInfo, i)
+		queue_create_infos[i].queueFamilyIndex = E_DYNARR_GET(vulkan_data_display->queue_family_info,
+				PVulkanQueueFamilyInfo, i)
 			.index;
 		queue_create_infos[i].queueCount = 1;
 		queue_create_infos[i].pQueuePriorities = E_PTR_FROM_VALUE(float, 1.f);
@@ -1038,3 +1047,4 @@ void p_vulkan_surface_destroy(PVulkanDataDisplay *vulkan_data_display)
 	free(vulkan_data_display);
 
 }
+
