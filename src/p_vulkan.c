@@ -627,6 +627,46 @@ EDynarr *p_vulkan_enable_layers(EDynarr *required_layers, EDynarr *optional_laye
 }
 
 /**
+ * p_vulkan_swapchain_auto_pick
+ *
+ * returns the swapchain details closest to the desired settings
+ * if none exist returns NULL in appropriate fields
+ * TODO: actually get closest values instead of first
+ */
+PVulkanSwapchainSupport p_vulkan_swapchain_auto_pick(VkPhysicalDevice physical_device, VkSurfaceKHR *surface)
+{
+	PVulkanSwapchainSupport swapchain = {0};
+
+	// Set swapchain details
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_device, *surface, &swapchain.capabilities);
+
+	uint32_t format_count;
+	vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, *surface, &format_count, NULL);
+	if (format_count != 0)
+	{
+		EDynarr *formats = e_dynarr_init(sizeof (VkSurfaceFormatKHR), format_count);
+		vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, *surface, &format_count, formats->arr);
+		formats->num_items = format_count;
+		// FIXME
+		swapchain.format = &E_DYNARR_GET(formats, VkSurfaceFormatKHR, 0);
+		e_dynarr_deinit(formats);
+	}
+	uint32_t present_mode_count;
+	vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, *surface, &present_mode_count, NULL);
+
+	if (present_mode_count != 0)
+	{
+		EDynarr *present_modes = e_dynarr_init(sizeof (VkPresentModeKHR), present_mode_count);
+		vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, *surface, &present_mode_count, present_modes->arr);
+		present_modes->num_items = present_mode_count;
+		// FIXME
+		swapchain.present_mode = &E_DYNARR_GET(present_modes, VkPresentModeKHR, 0);
+		e_dynarr_deinit(present_modes);
+	}
+	return swapchain;
+}
+
+/**
  * p_vulkan_device_set
  *
  * sets the physical device to use in vulkan_data_display from physical_device
@@ -689,8 +729,7 @@ PHANTOM_API void p_vulkan_device_set(
 		queue_create_infos[i].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
 
 		queue_create_infos[i].queueFamilyIndex = E_DYNARR_GET(vulkan_data_display->queue_family_info,
-				PVulkanQueueFamilyInfo, i)
-			.index;
+				PVulkanQueueFamilyInfo, i).index;
 		queue_create_infos[i].queueCount = 1;
 		queue_create_infos[i].pQueuePriorities = E_PTR_FROM_VALUE(float, 1.f);
 	}
@@ -731,6 +770,8 @@ PHANTOM_API void p_vulkan_device_set(
 	device_create_info.pQueueCreateInfos = device_queue_create_infos->arr;
 
 	// create logical device
+	if (vulkan_data_display->logical_device != VK_NULL_HANDLE)
+		vkDestroyDevice(vulkan_data_display->logical_device, NULL);
 	if (vkCreateDevice(physical_device, &device_create_info, NULL, &vulkan_data_display->logical_device) != VK_SUCCESS)
 	{
 		e_log_message(E_LOG_ERROR, L"Vulkan General", L"Failed to create logical device!");
@@ -749,14 +790,19 @@ PHANTOM_API void p_vulkan_device_set(
 		vkGetDeviceQueue(vulkan_data_display->logical_device, queue_family_info->index, i, &vk_queue);
 		queue_family_info->queue = vk_queue;
 	}
+
+	// Set swapchain data
+	vulkan_data_display->swapchain = p_vulkan_swapchain_auto_pick(physical_device, surface);
 }
 
 /**
  * p_vulkan_device_auto_pick
  *
- * picks the physical device for use with vulkan and adds it to vulkan_data_display
+ * initializes compatible_devices in vulkan_data_display
+ * picks the physical device for use with vulkan and returns it
+ * returns VK_NULL_HANDLE if no suitable device is found
  */
-PHANTOM_API void p_vulkan_device_auto_pick(
+PHANTOM_API VkPhysicalDevice p_vulkan_device_auto_pick(
 		PVulkanDataDisplay *vulkan_data_display,
 		PVulkanDataApp *vulkan_data_app,
 		PVulkanDisplayRequest *vulkan_request_display,
@@ -767,6 +813,8 @@ PHANTOM_API void p_vulkan_device_auto_pick(
 	uint32_t vulkan_available_device_count = 0;
 	vkEnumeratePhysicalDevices(vulkan_data_app->instance, &vulkan_available_device_count, NULL);
 
+	if (vulkan_data_display->compatible_devices != NULL)
+		e_dynarr_deinit(vulkan_data_display->compatible_devices);
 	vulkan_data_display->compatible_devices = e_dynarr_init(sizeof (VkPhysicalDevice), vulkan_available_device_count);
 	EDynarr *compatible_devices = vulkan_data_display->compatible_devices;
 	vkEnumeratePhysicalDevices(vulkan_data_app->instance, &vulkan_available_device_count, compatible_devices->arr);
@@ -786,6 +834,14 @@ PHANTOM_API void p_vulkan_device_auto_pick(
 
 		// Maximum possible size of textures affects graphics quality
 		score += device_properties.limits.maxImageDimension2D;
+
+		// Check for swapchain support
+		PVulkanSwapchainSupport swapchain = p_vulkan_swapchain_auto_pick(device, surface);
+		if (swapchain.format == NULL || swapchain.present_mode == NULL)
+		{
+			score = -1;
+			goto end_device_score_eval;
+		}
 
 		// evaluate optional and required queue flags
 		VkQueueFlags enabled_queue_flags = p_vulkan_enable_queue_flags(vulkan_request_display, device, surface);
@@ -897,14 +953,9 @@ end_device_score_eval:
 
 	if (max_score_index >= 0)
 	{
-		p_vulkan_device_set(vulkan_data_display, vulkan_request_display,
-				E_DYNARR_GET(compatible_devices, VkPhysicalDevice, max_score_index), surface);
-	}
-
-	if (vulkan_data_display->current_physical_device == VK_NULL_HANDLE)
-	{
-		e_log_message(E_LOG_ERROR, L"Vulkan General", L"Failed to find a suitable GPU!");
-		exit(1);
+		return E_DYNARR_GET(compatible_devices, VkPhysicalDevice, max_score_index);
+	} else {
+		return VK_NULL_HANDLE;
 	}
 }
 
@@ -999,6 +1050,9 @@ void p_vulkan_surface_create(PWindowData *window_data, PVulkanDataApp *vulkan_da
 	vulkan_data_display->surface = malloc(sizeof (VkSurfaceKHR));
 	vulkan_data_display->instance = &vulkan_data_app->instance;
 	vulkan_data_display->queue_family_info = NULL;
+	vulkan_data_display->compatible_devices = NULL;
+	vulkan_data_display->logical_device = VK_NULL_HANDLE;
+	vulkan_data_display->swapchain = (PVulkanSwapchainSupport){0};
 
 #ifdef PHANTOM_DISPLAY_X11
 	VkXcbSurfaceCreateInfoKHR vk_surface_create_info = {0};
@@ -1026,8 +1080,16 @@ void p_vulkan_surface_create(PWindowData *window_data, PVulkanDataApp *vulkan_da
 	}
 #endif
 
-	p_vulkan_device_auto_pick(vulkan_data_display, vulkan_data_app, vulkan_request_display,
-			vulkan_data_display->surface);
+	VkPhysicalDevice physical_device = p_vulkan_device_auto_pick(vulkan_data_display, vulkan_data_app,
+			vulkan_request_display, vulkan_data_display->surface);
+	physical_device = p_vulkan_device_auto_pick(vulkan_data_display, vulkan_data_app,
+			vulkan_request_display, vulkan_data_display->surface);
+	if (physical_device == VK_NULL_HANDLE)
+	{
+		e_log_message(E_LOG_ERROR, L"Vulkan General", L"Failed to find a suitable GPU!");
+		exit(1);
+	}
+	p_vulkan_device_set(vulkan_data_display, vulkan_request_display,physical_device, vulkan_data_display->surface);
 
 	window_data->vulkan_data_display = vulkan_data_display;
 }
@@ -1041,6 +1103,8 @@ void p_vulkan_surface_destroy(PVulkanDataDisplay *vulkan_data_display)
 {
 	e_dynarr_deinit(vulkan_data_display->queue_family_info);
 	e_dynarr_deinit(vulkan_data_display->compatible_devices);
+	free(vulkan_data_display->swapchain.present_mode);
+	free(vulkan_data_display->swapchain.format);
 	vkDestroySurfaceKHR(*vulkan_data_display->instance, *vulkan_data_display->surface, NULL);
 	vkDestroyDevice(vulkan_data_display->logical_device, NULL);
 	free(vulkan_data_display->surface);

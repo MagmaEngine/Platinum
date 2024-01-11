@@ -49,6 +49,18 @@ typedef struct PDeviceManager PDeviceManager;
 typedef struct PDisplayInfo PDisplayInfo;
 
 /**
+ * PVulkanSwapchainSupport
+ *
+ * This struct is used to hold the capabilities of a vulkan swap chain
+ */
+typedef struct {
+	VkSurfaceCapabilitiesKHR capabilities;
+	VkSurfaceFormatKHR *format; // pointer because NULL if none
+	VkPresentModeKHR *present_mode; // pointer because NULL if none
+
+} PVulkanSwapchainSupport;
+
+/**
  * PVulkanDataDisplay
  *
  * This struct contains data relevant to a vulkan display
@@ -60,6 +72,7 @@ typedef struct {
 	EDynarr *compatible_devices;
 	EDynarr *queue_family_info; // holds type PVulkanQueueFamilyInfo*
 	VkInstance *instance; // non-malloced pointer to PVulkanDataApp->instance
+	PVulkanSwapchainSupport swapchain;
 } PVulkanDataDisplay;
 
 /**
@@ -217,7 +230,7 @@ PHANTOM_API void p_vulkan_device_set(
 		VkPhysicalDevice physical_device,
 		VkSurfaceKHR *surface);
 
-PHANTOM_API void p_vulkan_device_auto_pick(
+PHANTOM_API VkPhysicalDevice p_vulkan_device_auto_pick(
 		PVulkanDataDisplay *vulkan_data_display,
 		PVulkanDataApp *vulkan_data_app,
 		PVulkanDisplayRequest *vulkan_request_display,
