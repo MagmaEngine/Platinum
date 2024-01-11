@@ -315,7 +315,7 @@ static void p_vulkan_destroy_debug_utils_messenger(
 static VkDebugUtilsMessengerCreateInfoEXT p_vulkan_init_debug_messenger(void)
 {
 	// create vulkan debug messenger
-	VkDebugUtilsMessengerCreateInfoEXT vk_debug_utils_messenger_create_info;
+	VkDebugUtilsMessengerCreateInfoEXT vk_debug_utils_messenger_create_info = {0};
 	vk_debug_utils_messenger_create_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
 	vk_debug_utils_messenger_create_info.messageSeverity =
 		VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
@@ -327,7 +327,6 @@ static VkDebugUtilsMessengerCreateInfoEXT p_vulkan_init_debug_messenger(void)
 		VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
 		VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 	vk_debug_utils_messenger_create_info.pfnUserCallback = _vulkan_debug_callback;
-	vk_debug_utils_messenger_create_info.pUserData = NULL;
 	return vk_debug_utils_messenger_create_info;
 }
 
@@ -372,7 +371,7 @@ static EDynarr *p_vulkan_find_queue_family_infos(
  */
 VkPhysicalDeviceFeatures p_vulkan_enable_features(PVulkanDisplayRequest *vulkan_request_display, VkPhysicalDevice device)
 {
-	VkPhysicalDeviceFeatures device_features;
+	VkPhysicalDeviceFeatures device_features = {0};
 	vkGetPhysicalDeviceFeatures(device, &device_features);
 
 	VkPhysicalDeviceFeatures enabled_features = {0};
@@ -514,7 +513,7 @@ PVulkanQueueFamilyInfo p_vulkan_find_viable_queue_family_info(PVulkanDisplayRequ
 	for (uint i = 0; i < queue_family_infos->num_items; i++)
 	{
 		bool viable = true;
-		PVulkanQueueFamilyInfo queue_family_info;
+		PVulkanQueueFamilyInfo queue_family_info = {0};
 		memcpy(&queue_family_info, &E_DYNARR_GET(queue_family_infos, PVulkanQueueFamilyInfo, i),
 				sizeof queue_family_info);
 
@@ -700,7 +699,7 @@ PHANTOM_API void p_vulkan_device_set(
 	VkPhysicalDeviceFeatures device_features  = p_vulkan_enable_features(vulkan_request_display, physical_device);
 
 	// Create logical device
-	VkDeviceCreateInfo device_create_info;
+	VkDeviceCreateInfo device_create_info = {0};
 	device_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 	device_create_info.pQueueCreateInfos = queue_create_infos;
 	device_create_info.queueCreateInfoCount = num_queue_families;
@@ -746,7 +745,7 @@ PHANTOM_API void p_vulkan_device_set(
 	{
 		PVulkanQueueFamilyInfo *queue_family_info =
 			&E_DYNARR_GET(vulkan_data_display->queue_family_info, PVulkanQueueFamilyInfo, i);
-		VkQueue vk_queue;
+		VkQueue vk_queue = {0};
 		vkGetDeviceQueue(vulkan_data_display->logical_device, queue_family_info->index, i, &vk_queue);
 		queue_family_info->queue = vk_queue;
 	}
@@ -778,7 +777,7 @@ PHANTOM_API void p_vulkan_device_auto_pick(
 	for (uint i = 0; i < compatible_devices->num_items; i++) {
 		int score = 0;
 		VkPhysicalDevice device = E_DYNARR_GET(compatible_devices, VkPhysicalDevice, i);
-		VkPhysicalDeviceProperties device_properties;
+		VkPhysicalDeviceProperties device_properties = {0};
 		vkGetPhysicalDeviceProperties(device, &device_properties);
 
 		// lots of score goes to discrete gpus
@@ -924,7 +923,7 @@ PVulkanDataApp *p_vulkan_init(PVulkanAppRequest *vulkan_request_app)
 #endif // PHANTOM_DEBUG_VULKAN
 
 	// create vulkan instance
-	VkApplicationInfo vk_app_info;
+	VkApplicationInfo vk_app_info = {0};
 	vk_app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 	vk_app_info.pApplicationName = "Phantom";
 	vk_app_info.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
@@ -932,7 +931,7 @@ PVulkanDataApp *p_vulkan_init(PVulkanAppRequest *vulkan_request_app)
 	vk_app_info.engineVersion = VK_MAKE_VERSION(1, 0, 0);
 	vk_app_info.apiVersion = VK_API_VERSION_1_0;
 
-	VkInstanceCreateInfo vk_instance_create_info;
+	VkInstanceCreateInfo vk_instance_create_info = {0};
 	vk_instance_create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 	vk_instance_create_info.pApplicationInfo = &vk_app_info;
 
@@ -946,6 +945,7 @@ PVulkanDataApp *p_vulkan_init(PVulkanAppRequest *vulkan_request_app)
 			vulkan_request_app->optional_layers);
 	vk_instance_create_info.enabledLayerCount = enabled_layers->num_items;
 	vk_instance_create_info.ppEnabledLayerNames = enabled_layers->arr;
+	vk_instance_create_info.flags = 0;
 
 #ifdef PHANTOM_DEBUG_VULKAN
 	VkDebugUtilsMessengerCreateInfoEXT vk_debug_utils_messenger_create_info = p_vulkan_init_debug_messenger();
@@ -1001,7 +1001,7 @@ void p_vulkan_surface_create(PWindowData *window_data, PVulkanDataApp *vulkan_da
 	vulkan_data_display->queue_family_info = NULL;
 
 #ifdef PHANTOM_DISPLAY_X11
-	VkXcbSurfaceCreateInfoKHR vk_surface_create_info;
+	VkXcbSurfaceCreateInfoKHR vk_surface_create_info = {0};
 	vk_surface_create_info.sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR;
 	vk_surface_create_info.connection = window_data->display_info->connection;
 	vk_surface_create_info.window = window_data->display_info->window;
