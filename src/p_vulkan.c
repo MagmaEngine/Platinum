@@ -607,7 +607,7 @@ EDynarr *_vulkan_enable_layers(const EDynarr * const required_layers, const EDyn
  *
  * helper function that creates a swapchain for the given window
  */
-static VkSwapchainKHR _vulkan_swapchain_create(
+static void _vulkan_swapchain_create(
 		PVulkanDataDisplay * const vulkan_data_display,
 		const uint32_t framebuffer_width,
 		const uint32_t framebuffer_height,
@@ -637,8 +637,11 @@ static VkSwapchainKHR _vulkan_swapchain_create(
 	swapchain_create_info.imageColorSpace = swapchain_support.format->colorSpace;
 	swapchain_create_info.imageExtent = extent;
 	// TODO: add options to change this
-	swapchain_create_info.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+	swapchain_create_info.preTransform = swapchain_support.capabilities.currentTransform;
 	swapchain_create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+	swapchain_create_info.presentMode = *swapchain_support.present_mode;
+	swapchain_create_info.clipped = VK_TRUE;
+	swapchain_create_info.oldSwapchain = VK_NULL_HANDLE; // TODO: change this when we recreate the swapchain
 	swapchain_create_info.imageArrayLayers = 1; // always 1 unless you use stereoscopic 3D
 
 	// TODO: change this if/when we add post processing
@@ -661,9 +664,14 @@ static VkSwapchainKHR _vulkan_swapchain_create(
 		swapchain_create_info.pQueueFamilyIndices = NULL; // Optional
 	}
 
-	VkSwapchainKHR swapchain;
-	vkCreateSwapchainKHR(vulkan_data_display->logical_device, &swapchain_create_info, NULL, &swapchain);
-	return swapchain;
+	if (vulkan_data_display->swapchain != VK_NULL_HANDLE)
+		vkDestroySwapchainKHR(vulkan_data_display->logical_device, vulkan_data_display->swapchain, NULL);
+	if (vkCreateSwapchainKHR(vulkan_data_display->logical_device, &swapchain_create_info, NULL,
+			&vulkan_data_display->swapchain) != VK_SUCCESS)
+	{
+		e_log_message(E_LOG_ERROR, L"Vulkan General", L"Failed to create swapchain!");
+		exit(1);
+	}
 }
 
 /**
@@ -868,8 +876,7 @@ PHANTOM_API void p_vulkan_device_set(
 
 	// Set swapchain data
 	PVulkanSwapchainSupport swapchain_support = _vulkan_swapchain_auto_pick(physical_device, surface);
-	vulkan_data_display->swapchain = _vulkan_swapchain_create(vulkan_data_display, window_data->x, window_data->y,
-			swapchain_support);
+	_vulkan_swapchain_create(vulkan_data_display, window_data->x, window_data->y, swapchain_support);
 	free(swapchain_support.format);
 	free(swapchain_support.present_mode);
 }
@@ -1175,7 +1182,7 @@ PHANTOM_API void p_vulkan_surface_create(PWindowData *window_data, PVulkanDataAp
 /**
  * p_vulkan_surface_destroy
  *
- * Destroys the vulkan_data_display. Need info from vulkan_data_app
+ * Destroys the vulkan_data_display
  */
 PHANTOM_API void p_vulkan_surface_destroy(PVulkanDataDisplay *vulkan_data_display)
 {
