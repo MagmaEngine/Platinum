@@ -482,7 +482,6 @@ static EThreadResult p_x11_window_event_manage(EThreadArguments args)
 			{
 				xcb_destroy_notify_event_t *destroy_notify_event = (xcb_destroy_notify_event_t *)event;
 				E_UNUSED(destroy_notify_event);
-				// TODO: handle errors
 
 				if (event_calls->enable_destroy && event_calls->destroy != NULL)
 					event_calls->destroy();

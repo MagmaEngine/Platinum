@@ -61,18 +61,42 @@ typedef struct {
 } PVulkanSwapchainSupport;
 
 /**
+ * PVulkanQueueFamilyInfo
+ *
+ * This struct is used to store information about the queue family
+ */
+typedef struct {
+	VkQueueFlags flags;
+	VkBool32 exists;
+	uint32_t index;
+	VkQueue queue;
+} PVulkanQueueFamilyInfo;
+
+enum PVulkanQueueType {
+	P_VULKAN_QUEUE_TYPE_GRAPHICS,
+	P_VULKAN_QUEUE_TYPE_PRESENT,
+	P_VULKAN_QUEUE_TYPE_COMPUTE,
+	P_VULKAN_QUEUE_TYPE_TRANSFER,
+	P_VULKAN_QUEUE_TYPE_SPARSE,
+	P_VULKAN_QUEUE_TYPE_PROTECTED,
+	P_VULKAN_QUEUE_TYPE_VIDEO_DECODE,
+	P_VULKAN_QUEUE_TYPE_OPTICAL_FLOW,
+	P_VULKAN_QUEUE_TYPE_MAX
+};
+
+/**
  * PVulkanDataDisplay
  *
  * This struct contains data relevant to a vulkan display
  */
 typedef struct {
-	VkSurfaceKHR *surface;
+	VkSurfaceKHR surface;
 	VkPhysicalDevice current_physical_device;
 	VkDevice logical_device;
 	EDynarr *compatible_devices;
-	EDynarr *queue_family_info; // holds type PVulkanQueueFamilyInfo*
-	VkInstance *instance; // non-malloced pointer to PVulkanDataApp->instance
-	PVulkanSwapchainSupport swapchain;
+	PVulkanQueueFamilyInfo queue_family_infos[P_VULKAN_QUEUE_TYPE_MAX];
+	VkInstance instance; // non-malloced pointer to PVulkanDataApp->instance
+	VkSwapchainKHR swapchain;
 } PVulkanDataDisplay;
 
 /**
@@ -149,18 +173,6 @@ typedef struct {
 } PWindowRequest;
 
 /**
- * PVulkanQueueFamilyInfo
- *
- * This struct is used to store information about the queue family
- */
-typedef struct {
-	VkQueueFlags flags;
-	VkBool32 exists;
-	uint32_t index;
-	VkQueue queue;
-} PVulkanQueueFamilyInfo;
-
-/**
  * PVulkanAppRequest
  *
  * This struct is used to create a new vulkan app with the requested settings
@@ -226,15 +238,16 @@ void p_vulkan_surface_destroy(PVulkanDataDisplay *vulkan_data_display);
 
 PHANTOM_API void p_vulkan_device_set(
 		PVulkanDataDisplay *vulkan_data_display,
-		PVulkanDisplayRequest *vulkan_request_display,
-		VkPhysicalDevice physical_device,
-		VkSurfaceKHR *surface);
+		const PVulkanDisplayRequest * const vulkan_request_display,
+		const VkPhysicalDevice physical_device,
+		const VkSurfaceKHR surface,
+		const PWindowData * const window_data);
 
 PHANTOM_API VkPhysicalDevice p_vulkan_device_auto_pick(
 		PVulkanDataDisplay *vulkan_data_display,
-		PVulkanDataApp *vulkan_data_app,
-		PVulkanDisplayRequest *vulkan_request_display,
-		VkSurfaceKHR *surface);
+		const PVulkanDataApp * const vulkan_data_app,
+		const PVulkanDisplayRequest * const vulkan_request_display,
+		const VkSurfaceKHR surface);
 
 
 // X11 systems
