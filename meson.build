@@ -67,7 +67,7 @@ elif library_buildtype == 'static'
     dependencies: phantom_deps,
     include_directories: include_directories('include'),
     c_args : phantom_c_args,
-    install : true)
+    install : false)
 endif
 
 dep_libphantom = declare_dependency(

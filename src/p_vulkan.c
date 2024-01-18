@@ -631,7 +631,6 @@ EDynarr *p_vulkan_enable_layers(EDynarr *required_layers, EDynarr *optional_laye
  *
  * returns the swapchain details closest to the desired settings
  * if none exist returns NULL in appropriate fields
- * TODO: actually get closest values instead of first
  */
 PVulkanSwapchainSupport p_vulkan_swapchain_auto_pick(VkPhysicalDevice physical_device, VkSurfaceKHR *surface)
 {
@@ -647,8 +646,21 @@ PVulkanSwapchainSupport p_vulkan_swapchain_auto_pick(VkPhysicalDevice physical_d
 		EDynarr *formats = e_dynarr_init(sizeof (VkSurfaceFormatKHR), format_count);
 		vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, *surface, &format_count, formats->arr);
 		formats->num_items = format_count;
-		// FIXME
-		swapchain.format = &E_DYNARR_GET(formats, VkSurfaceFormatKHR, 0);
+
+
+		VkSurfaceFormatKHR format = E_DYNARR_GET(formats, VkSurfaceFormatKHR, 0);
+		for (uint i = 0; i < format_count; i++)
+		{
+			VkSurfaceFormatKHR current_format = E_DYNARR_GET(formats, VkSurfaceFormatKHR, i);
+			if (current_format.format == VK_FORMAT_B8G8R8A8_SRGB)
+			{
+				format = current_format;
+				break;
+			}
+		}
+
+		swapchain.format = malloc(sizeof (VkSurfaceFormatKHR));
+		*swapchain.format = format;
 		e_dynarr_deinit(formats);
 	}
 	uint32_t present_mode_count;
@@ -659,8 +671,20 @@ PVulkanSwapchainSupport p_vulkan_swapchain_auto_pick(VkPhysicalDevice physical_d
 		EDynarr *present_modes = e_dynarr_init(sizeof (VkPresentModeKHR), present_mode_count);
 		vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, *surface, &present_mode_count, present_modes->arr);
 		present_modes->num_items = present_mode_count;
-		// FIXME
-		swapchain.present_mode = &E_DYNARR_GET(present_modes, VkPresentModeKHR, 0);
+
+		VkPresentModeKHR present_mode = E_DYNARR_GET(present_modes, VkPresentModeKHR, 0);
+		for (uint i = 0; i < present_mode_count; i++)
+		{
+			VkPresentModeKHR current_present_mode = E_DYNARR_GET(present_modes, VkPresentModeKHR, i);
+			if (current_present_mode == VK_PRESENT_MODE_MAILBOX_KHR)
+			{
+				present_mode = current_present_mode;
+				break;
+			}
+		}
+
+		swapchain.present_mode = malloc(sizeof (VkPresentModeKHR));
+		*swapchain.present_mode = present_mode;
 		e_dynarr_deinit(present_modes);
 	}
 	return swapchain;
@@ -842,6 +866,8 @@ PHANTOM_API VkPhysicalDevice p_vulkan_device_auto_pick(
 			score = -1;
 			goto end_device_score_eval;
 		}
+		free(swapchain.format);
+		free(swapchain.present_mode);
 
 		// evaluate optional and required queue flags
 		VkQueueFlags enabled_queue_flags = p_vulkan_enable_queue_flags(vulkan_request_display, device, surface);
@@ -1109,6 +1135,5 @@ void p_vulkan_surface_destroy(PVulkanDataDisplay *vulkan_data_display)
 	vkDestroyDevice(vulkan_data_display->logical_device, NULL);
 	free(vulkan_data_display->surface);
 	free(vulkan_data_display);
-
 }
 
