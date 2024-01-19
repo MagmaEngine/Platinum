@@ -615,14 +615,16 @@ static void _vulkan_swapchain_create(
 {
 
 	// Set extent
-	VkExtent2D extent;
-	extent.width = e_mini(
+	vulkan_data_display->swapchain_extent.width = e_mini(
 			e_maxi(framebuffer_width, swapchain_support.capabilities.minImageExtent.width),
 			swapchain_support.capabilities.maxImageExtent.width);
 
-	extent.height = e_mini(
+	vulkan_data_display->swapchain_extent.height = e_mini(
 			e_maxi(framebuffer_height, swapchain_support.capabilities.minImageExtent.height),
 			swapchain_support.capabilities.maxImageExtent.height);
+
+	// Save format for later
+	vulkan_data_display->swapchain_format = swapchain_support.format->format;
 
 	// Set image count
 	uint32_t image_count = swapchain_support.capabilities.minImageCount + 1;
@@ -635,7 +637,7 @@ static void _vulkan_swapchain_create(
 	swapchain_create_info.minImageCount = image_count;
 	swapchain_create_info.imageFormat = swapchain_support.format->format;
 	swapchain_create_info.imageColorSpace = swapchain_support.format->colorSpace;
-	swapchain_create_info.imageExtent = extent;
+	swapchain_create_info.imageExtent = vulkan_data_display->swapchain_extent;
 	// TODO: add options to change this
 	swapchain_create_info.preTransform = swapchain_support.capabilities.currentTransform;
 	swapchain_create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
@@ -672,6 +674,11 @@ static void _vulkan_swapchain_create(
 		e_log_message(E_LOG_ERROR, L"Vulkan General", L"Failed to create swapchain!");
 		exit(1);
 	}
+	vkGetSwapchainImagesKHR(vulkan_data_display->logical_device, vulkan_data_display->swapchain, &image_count, NULL);
+	vulkan_data_display->swapchain_images = e_dynarr_init(sizeof (VkImage), image_count);
+	vulkan_data_display->swapchain_images->num_items = image_count;
+	vkGetSwapchainImagesKHR(vulkan_data_display->logical_device, vulkan_data_display->swapchain, &image_count,
+			vulkan_data_display->swapchain_images->arr);
 }
 
 /**
@@ -1187,6 +1194,7 @@ PHANTOM_API void p_vulkan_surface_create(PWindowData *window_data, PVulkanDataAp
 PHANTOM_API void p_vulkan_surface_destroy(PVulkanDataDisplay *vulkan_data_display)
 {
 	e_dynarr_deinit(vulkan_data_display->compatible_devices);
+	e_dynarr_deinit(vulkan_data_display->swapchain_images);
 	vkDestroySwapchainKHR(vulkan_data_display->logical_device, vulkan_data_display->swapchain, NULL);
 	vkDestroySurfaceKHR(vulkan_data_display->instance, vulkan_data_display->surface, NULL);
 	vkDestroyDevice(vulkan_data_display->logical_device, NULL);

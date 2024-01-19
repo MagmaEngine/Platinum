@@ -97,6 +97,9 @@ typedef struct {
 	PVulkanQueueFamilyInfo queue_family_infos[P_VULKAN_QUEUE_TYPE_MAX];
 	VkInstance instance; // non-malloced pointer to PVulkanDataApp->instance
 	VkSwapchainKHR swapchain;
+	VkExtent2D swapchain_extent;
+	VkFormat swapchain_format;
+	EDynarr *swapchain_images; // contains VkImage
 } PVulkanDataDisplay;
 
 /**
