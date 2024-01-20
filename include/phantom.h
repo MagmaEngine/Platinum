@@ -100,6 +100,7 @@ typedef struct {
 	VkExtent2D swapchain_extent;
 	VkFormat swapchain_format;
 	EDynarr *swapchain_images; // contains VkImage
+	EDynarr *swapchain_image_views; // contains VkImageView
 } PVulkanDataDisplay;
 
 /**

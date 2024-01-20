@@ -679,6 +679,35 @@ static void _vulkan_swapchain_create(
 	vulkan_data_display->swapchain_images->num_items = image_count;
 	vkGetSwapchainImagesKHR(vulkan_data_display->logical_device, vulkan_data_display->swapchain, &image_count,
 			vulkan_data_display->swapchain_images->arr);
+
+	// Create image views
+	vulkan_data_display->swapchain_image_views = e_dynarr_init(sizeof (VkImageView), image_count);
+	vulkan_data_display->swapchain_image_views->num_items = image_count;
+	for (uint i = 0; i < image_count; i++)
+	{
+		VkImageViewCreateInfo image_view_create_info = {0};
+		image_view_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		image_view_create_info.image = E_DYNARR_GET(vulkan_data_display->swapchain_images, VkImage, i);
+		image_view_create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		image_view_create_info.format = vulkan_data_display->swapchain_format;
+		image_view_create_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+		image_view_create_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+		image_view_create_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+		image_view_create_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+		image_view_create_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		image_view_create_info.subresourceRange.baseMipLevel = 0;
+		image_view_create_info.subresourceRange.levelCount = 1;
+		image_view_create_info.subresourceRange.baseArrayLayer = 0;
+		image_view_create_info.subresourceRange.layerCount = 1;
+
+		if (vkCreateImageView(vulkan_data_display->logical_device, &image_view_create_info, NULL,
+				&E_DYNARR_GET(vulkan_data_display->swapchain_image_views, VkImageView, i)) != VK_SUCCESS)
+		{
+			e_log_message(E_LOG_ERROR, L"Vulkan General", L"Failed to create image view!");
+			exit(1);
+		}
+	}
+
 }
 
 /**
@@ -1195,6 +1224,10 @@ PHANTOM_API void p_vulkan_surface_destroy(PVulkanDataDisplay *vulkan_data_displa
 {
 	e_dynarr_deinit(vulkan_data_display->compatible_devices);
 	e_dynarr_deinit(vulkan_data_display->swapchain_images);
+	for (uint i = 0; i < vulkan_data_display->swapchain_image_views->num_items; i++)
+		vkDestroyImageView(vulkan_data_display->logical_device,
+				E_DYNARR_GET(vulkan_data_display->swapchain_image_views, VkImageView, i), NULL);
+	e_dynarr_deinit(vulkan_data_display->swapchain_image_views);
 	vkDestroySwapchainKHR(vulkan_data_display->logical_device, vulkan_data_display->swapchain, NULL);
 	vkDestroySurfaceKHR(vulkan_data_display->instance, vulkan_data_display->surface, NULL);
 	vkDestroyDevice(vulkan_data_display->logical_device, NULL);
