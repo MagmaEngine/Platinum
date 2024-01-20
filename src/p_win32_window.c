@@ -268,7 +268,7 @@ static void _win32_window_close(PAppInstance *app_instance, PWindowData *window_
 		e_log_message(E_LOG_ERROR, L"Phantom", L"Window does not exist...");
 		exit(1);
 	}
-	p_vulkan_surface_destroy(window_data->vulkan_data_display);
+	p_graphics_display_destroy(window_data->graphical_display_data);
 	free(window_data->display_info);
 	if (window_data->status == P_WINDOW_STATUS_CLOSE)
 	{
@@ -329,7 +329,7 @@ static EThreadResult WINAPI p_win32_window_event_manage(EThreadArguments args)
 			exit(1);
 	}
 
-	p_vulkan_surface_create(window_data, app_instance->vulkan_app_data, &window_request.vulkan_display_request);
+	p_graphics_display_create(window_data, app_data->graphical_app_data, &window_request.graphical_display_request);
 
 	e_mutex_lock(app_instance->window_mutex);
 	e_dynarr_add(app_instance->window_data, &window_data);

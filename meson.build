@@ -1,15 +1,21 @@
-phantom_srcs = [
-      files('src/p_vulkan.c'),
-      ]
+phantom_srcs = []
 
 phantom_deps = [
   dep_libenigma,
-  dep_vulkan,
   ]
 
 phantom_c_args = []
 
 ## Phantom build setup
+# Vulkan
+if graphics == 'vulkan'
+  phantom_srcs += [
+    files('src/p_vulkan.c'),
+  ]
+  phantom_deps += [
+    dep_vulkan,
+  ]
+endif
 # Windows
 if host_machine.system() == 'windows'
   phantom_srcs += [

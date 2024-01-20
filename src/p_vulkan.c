@@ -8,6 +8,101 @@
 #endif // PHANTOM_DISPLAY_XXXXXX
 
 /**
+ * _vulkan_app_request_convert
+ *
+ * converts PGraphicalAppRequest into PVulkanAppRequest
+ */
+static
+PVulkanAppRequest *_vulkan_app_request_convert(const PGraphicalAppRequest * const graphical_app_request)
+{
+	PVulkanAppRequest *vulkan_app_request = malloc(sizeof(PVulkanAppRequest));
+	// Convert wrapper request into needed data
+	// extensions
+	vulkan_app_request->required_extensions = e_dynarr_init(sizeof(char *), 3);
+	if (!graphical_app_request->headless)
+	{
+		e_dynarr_add(vulkan_app_request->required_extensions, E_VOID_PTR_FROM_VALUE(char *,
+					VK_KHR_SURFACE_EXTENSION_NAME));
+#ifdef PHANTOM_DISPLAY_X11
+		e_dynarr_add(vulkan_app_request->required_extensions, E_VOID_PTR_FROM_VALUE(char *,
+					VK_KHR_XCB_SURFACE_EXTENSION_NAME));
+#endif // PHANTOM_DISPLAY_X11
+#ifdef PHANTOM_DISPLAY_WIN32
+		e_dynarr_add(vulkan_app_data->required_extensions, E_VOID_PTR_FROM_VALUE(char *,
+					VK_KHR_WIN32_SURFACE_EXTENSION_NAME));
+#endif // PHANTOM_DISPLAY_WIN32
+	}
+#ifdef PHANTOM_DEBUG_GRAPHICS
+	e_dynarr_add(vulkan_app_request->required_extensions, E_VOID_PTR_FROM_VALUE(char *,
+				VK_EXT_DEBUG_UTILS_EXTENSION_NAME));
+#endif // PHANTOM_DEBUG_GRAPHICS
+
+	// layers
+	vulkan_app_request->required_layers = e_dynarr_init(sizeof(char *), 1);
+#ifdef PHANTOM_DEBUG_GRAPHICS
+	e_dynarr_add(vulkan_app_request->required_layers, E_VOID_PTR_FROM_VALUE(char *, "VK_LAYER_KHRONOS_validation"));
+#endif // PHANTOM_DEBUG_GRAPHICS
+	return vulkan_app_request;
+}
+
+/**
+ * _vulkan_app_request_destroy
+ *
+ * deinits data created as a part of request init
+ */
+static
+void _vulkan_app_request_destroy(PVulkanAppRequest *vulkan_app_request)
+{
+	e_dynarr_deinit(vulkan_app_request->required_extensions);
+	e_dynarr_deinit(vulkan_app_request->required_layers);
+	free(vulkan_app_request);
+}
+
+/**
+ * _vulkan_display_request_convert
+ *
+ * converts PGraphicalDisplayRequest into PVulkanDisplayRequest
+ */
+static
+PVulkanDisplayRequest *_vulkan_display_request_convert(const PGraphicalDisplayRequest * const graphic_display_request)
+{
+	PVulkanDisplayRequest *vulkan_display_request = malloc(sizeof(PVulkanDisplayRequest));
+
+	// Convert wrapper request into needed data
+	vulkan_display_request->stereoscopic = graphic_display_request->stereoscopic;
+	vulkan_display_request->require_present = !graphic_display_request->headless;
+	// extensions
+	vulkan_display_request->required_extensions = e_dynarr_init(sizeof(char *), 3);
+	if (!graphic_display_request->headless)
+	{
+		e_dynarr_add(vulkan_display_request->required_extensions, E_VOID_PTR_FROM_VALUE(char *,
+					VK_KHR_SWAPCHAIN_EXTENSION_NAME));
+	}
+	// layers
+	vulkan_display_request->required_layers = e_dynarr_init(sizeof(char *), 1);
+#ifdef PHANTOM_DEBUG_GRAPHICS
+	e_dynarr_add(vulkan_display_request->required_layers, E_VOID_PTR_FROM_VALUE(char *,
+				"VK_LAYER_KHRONOS_validation"));
+#endif // PHANTOM_DEBUG_GRAPHICS
+	vulkan_display_request->required_queue_flags = VK_QUEUE_GRAPHICS_BIT;
+	vulkan_display_request->required_features = (VkPhysicalDeviceFeatures){0};
+	vulkan_display_request->required_features.geometryShader = true;
+	return vulkan_display_request;
+}
+
+/**
+ * _vulkan_display_request_destroy
+ *
+ * deinits data created as a part of request init
+ */
+PHANTOM_API void _vulkan_display_request_destroy(PVulkanDisplayRequest *vulkan_display_request)
+{
+	e_dynarr_deinit(vulkan_display_request->required_extensions);
+	e_dynarr_deinit(vulkan_display_request->required_layers);
+	free(vulkan_display_request);
+}
+
+/**
  * _vulkan_extension_exists
  *
  * returns true if the vulkan_extension is found
@@ -429,6 +524,7 @@ static void _vulkan_swapchain_create(
 		PVulkanDisplayData * const vulkan_display_data,
 		const uint32_t framebuffer_width,
 		const uint32_t framebuffer_height,
+		const PGraphicalDisplayRequest * const graphical_display_request,
 		const PVulkanSwapchainSupport swapchain_support)
 {
 
@@ -462,7 +558,7 @@ static void _vulkan_swapchain_create(
 	swapchain_create_info.presentMode = *swapchain_support.present_mode;
 	swapchain_create_info.clipped = VK_TRUE;
 	swapchain_create_info.oldSwapchain = VK_NULL_HANDLE; // TODO: change this when we recreate the swapchain
-	swapchain_create_info.imageArrayLayers = 1; // always 1 unless you use stereoscopic 3D
+	swapchain_create_info.imageArrayLayers = (graphical_display_request->stereoscopic) ? 2 : 1;
 
 	// TODO: change this if/when we add post processing
 	// right now we are rendering directly to the swapchain
@@ -597,50 +693,56 @@ static PVulkanSwapchainSupport _vulkan_swapchain_auto_pick(const VkPhysicalDevic
  * p_vulkan_device_set
  *
  * sets the physical device to use in vulkan_display_data from physical_device
- * also creates a logical device with vulkan_request_app and sets it to vulkan_display_data
+ * also creates a logical device with vulkan_app_request and sets it to vulkan_display_data
  */
-PHANTOM_API void p_vulkan_device_set(
-		PVulkanDisplayData *vulkan_display_data,
-		const PVulkanDisplayRequest * const vulkan_display_request,
-		const VkPhysicalDevice physical_device,
-		const VkSurfaceKHR surface,
+PHANTOM_API
+void p_vulkan_device_set(
+		PGraphicalDisplayData *graphical_display_data,
+		const PGraphicalDisplayRequest * const graphical_display_request,
+		const PGraphicalDevice physical_device,
+		const PGraphicalDisplay display,
 		const PWindowData * const window_data)
+
 {
-	if (e_dynarr_find(vulkan_display_data->compatible_devices, &physical_device) == -1)
+	// convert
+	PVulkanDisplayRequest *vulkan_display_request = _vulkan_display_request_convert(graphical_display_request);
+	PVulkanDisplayData *vulkan_display_data = graphical_display_data;
+
+	if (e_dynarr_find(vulkan_display_data->compatible_devices, &physical_device.handle) == -1)
 	{
 		e_log_message(E_LOG_ERROR, L"Vulkan General", L"Selected device is not compatible");
 		exit(1);
 	}
 
 	// Set physical device
-	vulkan_display_data->current_physical_device = physical_device;
+	vulkan_display_data->current_physical_device = physical_device.handle;
 
 	// Set queue family indices
-	VkQueueFlags enabled_queue_flags = _vulkan_get_required_queue_flags(vulkan_display_request, physical_device, surface);
+	VkQueueFlags enabled_queue_flags = _vulkan_get_required_queue_flags(vulkan_display_request, physical_device.handle, display);
 	if (enabled_queue_flags & VK_QUEUE_GRAPHICS_BIT)
 		vulkan_display_data->queue_family_infos[P_VULKAN_QUEUE_TYPE_GRAPHICS] =
-			_vulkan_find_viable_queue_family_info(physical_device, surface, VK_QUEUE_GRAPHICS_BIT, false);
+			_vulkan_find_viable_queue_family_info(physical_device.handle, display, VK_QUEUE_GRAPHICS_BIT, false);
 	if (vulkan_display_request->require_present)
 		vulkan_display_data->queue_family_infos[P_VULKAN_QUEUE_TYPE_PRESENT] =
-			_vulkan_find_viable_queue_family_info(physical_device, surface, VK_QUEUE_GRAPHICS_BIT, true);
+			_vulkan_find_viable_queue_family_info(physical_device.handle, display, VK_QUEUE_GRAPHICS_BIT, true);
 	if (enabled_queue_flags & VK_QUEUE_COMPUTE_BIT)
 		vulkan_display_data->queue_family_infos[P_VULKAN_QUEUE_TYPE_COMPUTE] =
-			_vulkan_find_viable_queue_family_info(physical_device, surface, VK_QUEUE_COMPUTE_BIT, false);
+			_vulkan_find_viable_queue_family_info(physical_device.handle, display, VK_QUEUE_COMPUTE_BIT, false);
 	if (enabled_queue_flags & VK_QUEUE_TRANSFER_BIT)
 		vulkan_display_data->queue_family_infos[P_VULKAN_QUEUE_TYPE_TRANSFER] =
-			_vulkan_find_viable_queue_family_info(physical_device, surface, VK_QUEUE_TRANSFER_BIT, false);
+			_vulkan_find_viable_queue_family_info(physical_device.handle, display, VK_QUEUE_TRANSFER_BIT, false);
 	if (enabled_queue_flags & VK_QUEUE_SPARSE_BINDING_BIT)
 		vulkan_display_data->queue_family_infos[P_VULKAN_QUEUE_TYPE_SPARSE] =
-			_vulkan_find_viable_queue_family_info(physical_device, surface, VK_QUEUE_SPARSE_BINDING_BIT, false);
+			_vulkan_find_viable_queue_family_info(physical_device.handle, display, VK_QUEUE_SPARSE_BINDING_BIT, false);
 	if (enabled_queue_flags & VK_QUEUE_PROTECTED_BIT)
 		vulkan_display_data->queue_family_infos[P_VULKAN_QUEUE_TYPE_PROTECTED] =
-			_vulkan_find_viable_queue_family_info(physical_device, surface, VK_QUEUE_PROTECTED_BIT, false);
+			_vulkan_find_viable_queue_family_info(physical_device.handle, display, VK_QUEUE_PROTECTED_BIT, false);
 	if (enabled_queue_flags & VK_QUEUE_VIDEO_DECODE_BIT_KHR)
 		vulkan_display_data->queue_family_infos[P_VULKAN_QUEUE_TYPE_VIDEO_DECODE] =
-			_vulkan_find_viable_queue_family_info(physical_device, surface, VK_QUEUE_VIDEO_DECODE_BIT_KHR, false);
+			_vulkan_find_viable_queue_family_info(physical_device.handle, display, VK_QUEUE_VIDEO_DECODE_BIT_KHR, false);
 	if (enabled_queue_flags & VK_QUEUE_OPTICAL_FLOW_BIT_NV)
 		vulkan_display_data->queue_family_infos[P_VULKAN_QUEUE_TYPE_OPTICAL_FLOW] =
-			_vulkan_find_viable_queue_family_info(physical_device, surface, VK_QUEUE_OPTICAL_FLOW_BIT_NV, false);
+			_vulkan_find_viable_queue_family_info(physical_device.handle, display, VK_QUEUE_OPTICAL_FLOW_BIT_NV, false);
 
 	EDynarr *queue_family_infos = e_dynarr_init(sizeof (PVulkanQueueFamilyInfo), 1);
 	for (uint i = 0; i < P_VULKAN_QUEUE_TYPE_MAX; i++)
@@ -672,7 +774,7 @@ PHANTOM_API void p_vulkan_device_set(
 	}
 
 	// Set device features
-	VkPhysicalDeviceFeatures device_features  = _vulkan_get_required_features(vulkan_display_request, physical_device);
+	VkPhysicalDeviceFeatures device_features  = _vulkan_get_required_features(vulkan_display_request, physical_device.handle);
 
 	// Create logical device
 	VkDeviceCreateInfo device_create_info = {0};
@@ -688,6 +790,8 @@ PHANTOM_API void p_vulkan_device_set(
 	EDynarr *enabled_layers = _vulkan_get_required_layers(vulkan_display_request->required_layers);
 	device_create_info.enabledLayerCount = enabled_layers->num_items;
 	device_create_info.ppEnabledLayerNames = enabled_layers->arr;
+
+	_vulkan_display_request_destroy(vulkan_display_request);
 
 	// Set logical device queues
 	EDynarr *device_queue_create_infos = e_dynarr_init(sizeof (VkDeviceQueueCreateInfo), 1);
@@ -706,7 +810,8 @@ PHANTOM_API void p_vulkan_device_set(
 	// create logical device
 	if (vulkan_display_data->logical_device != VK_NULL_HANDLE)
 		vkDestroyDevice(vulkan_display_data->logical_device, NULL);
-	if (vkCreateDevice(physical_device, &device_create_info, NULL, &vulkan_display_data->logical_device) != VK_SUCCESS)
+	if (vkCreateDevice(vulkan_display_data->current_physical_device, &device_create_info, NULL,
+				&vulkan_display_data->logical_device) != VK_SUCCESS)
 	{
 		e_log_message(E_LOG_ERROR, L"Vulkan General", L"Failed to create logical device!");
 		exit(1);
@@ -727,8 +832,9 @@ PHANTOM_API void p_vulkan_device_set(
 	}
 
 	// Set swapchain data
-	PVulkanSwapchainSupport swapchain_support = _vulkan_swapchain_auto_pick(physical_device, surface);
-	_vulkan_swapchain_create(vulkan_display_data, window_data->x, window_data->y, swapchain_support);
+	PVulkanSwapchainSupport swapchain_support = _vulkan_swapchain_auto_pick(physical_device.handle, display);
+	_vulkan_swapchain_create(vulkan_display_data, window_data->x, window_data->y, graphical_display_request,
+			swapchain_support);
 	free(swapchain_support.format);
 	free(swapchain_support.present_mode);
 }
@@ -740,12 +846,15 @@ PHANTOM_API void p_vulkan_device_set(
  * picks the physical device for use with vulkan and returns it
  * returns VK_NULL_HANDLE if no suitable device is found
  */
-PHANTOM_API VkPhysicalDevice p_vulkan_device_auto_pick(
-		PVulkanDisplayData *vulkan_display_data,
-		const PVulkanAppData * const vulkan_app_data,
-		const PVulkanDisplayRequest * const vulkan_display_request,
-		const VkSurfaceKHR surface)
+PHANTOM_API
+PGraphicalDevice p_vulkan_device_auto_pick(
+		PGraphicalDisplayData *graphical_display_data,
+		const PGraphicalAppData * const graphical_app_data,
+		const PGraphicalDisplayRequest * const graphical_display_request,
+		const PGraphicalDisplay display)
 {
+	PVulkanDisplayData *vulkan_display_data = graphical_display_data;
+	const PVulkanAppData * const vulkan_app_data = graphical_app_data;
 	vulkan_display_data->current_physical_device = VK_NULL_HANDLE;
 
 	uint32_t vulkan_available_device_count = 0;
@@ -774,7 +883,7 @@ PHANTOM_API VkPhysicalDevice p_vulkan_device_auto_pick(
 		score += device_properties.limits.maxImageDimension2D;
 
 		// Check for swapchain support
-		PVulkanSwapchainSupport swapchain = _vulkan_swapchain_auto_pick(device, surface);
+		PVulkanSwapchainSupport swapchain = _vulkan_swapchain_auto_pick(device, display);
 		if (swapchain.format == NULL || swapchain.present_mode == NULL)
 		{
 			score = -1;
@@ -784,10 +893,12 @@ PHANTOM_API VkPhysicalDevice p_vulkan_device_auto_pick(
 		free(swapchain.present_mode);
 
 		// get required queue flags to make sure they exist
-		_vulkan_get_required_queue_flags(vulkan_display_request, device, surface);
+		PVulkanDisplayRequest *vulkan_display_request = _vulkan_display_request_convert(graphical_display_request);
+		_vulkan_get_required_queue_flags(vulkan_display_request, device, display);
 
 		// get required features to make sure they exist
 		_vulkan_get_required_features(vulkan_display_request, device);
+		_vulkan_display_request_destroy(vulkan_display_request);
 
 end_device_score_eval:
 		e_dynarr_add(device_score, E_VOID_PTR_FROM_VALUE(int, score));
@@ -815,9 +926,14 @@ end_device_score_eval:
 
 	if (max_score_index >= 0)
 	{
-		return E_DYNARR_GET(compatible_devices, VkPhysicalDevice, max_score_index);
+		PGraphicalDevice device = (PGraphicalDevice){0};
+		device.handle = E_DYNARR_GET(compatible_devices, VkPhysicalDevice, max_score_index);
+		VkPhysicalDeviceProperties device_properties;
+		vkGetPhysicalDeviceProperties(device.handle, &device_properties);
+		device.name = device_properties.deviceName;
+		return device;
 	} else {
-		return VK_NULL_HANDLE;
+		return (PGraphicalDevice){0};
 	}
 }
 
@@ -826,14 +942,15 @@ end_device_score_eval:
  *
  * Initializes vulkan and sets the result in app_instance
  */
-PHANTOM_API PVulkanAppData *p_vulkan_init(PVulkanAppRequest *vulkan_request_app)
+PHANTOM_API PGraphicalAppData *p_vulkan_init(PGraphicalAppRequest *graphical_app_request)
 {
-	PVulkanAppData *vulkan_app_data = malloc(sizeof *vulkan_app_data);
+	PVulkanAppRequest *vulkan_app_request = _vulkan_app_request_convert(graphical_app_request);
+	PGraphicalAppData *vulkan_app_data = malloc(sizeof *vulkan_app_data);
 
-#ifdef PHANTOM_DEBUG_VULKAN
+#ifdef PHANTOM_DEBUG_GRAPHICS
 	p_vulkan_list_available_extensions();
 	p_vulkan_list_available_layers();
-#endif // PHANTOM_DEBUG_VULKAN
+#endif // PHANTOM_DEBUG_GRAPHICS
 
 	// create vulkan instance
 	VkApplicationInfo vk_app_info = {0};
@@ -849,21 +966,23 @@ PHANTOM_API PVulkanAppData *p_vulkan_init(PVulkanAppRequest *vulkan_request_app)
 	vk_instance_create_info.pApplicationInfo = &vk_app_info;
 
 	// Add all required extensions and optional extensions that exist
-	EDynarr *enabled_extensions = _vulkan_get_required_extensions(vulkan_request_app->required_extensions);
+	EDynarr *enabled_extensions = _vulkan_get_required_extensions(vulkan_app_request->required_extensions);
 	vk_instance_create_info.enabledExtensionCount = enabled_extensions->num_items;
 	vk_instance_create_info.ppEnabledExtensionNames = enabled_extensions->arr;
 
-	EDynarr *enabled_layers = _vulkan_get_required_layers(vulkan_request_app->required_layers);
+	EDynarr *enabled_layers = _vulkan_get_required_layers(vulkan_app_request->required_layers);
 	vk_instance_create_info.enabledLayerCount = enabled_layers->num_items;
 	vk_instance_create_info.ppEnabledLayerNames = enabled_layers->arr;
 	vk_instance_create_info.flags = 0;
 
-#ifdef PHANTOM_DEBUG_VULKAN
+	_vulkan_app_request_destroy(vulkan_app_request);
+
+#ifdef PHANTOM_DEBUG_GRAPHICS
 	VkDebugUtilsMessengerCreateInfoEXT vk_debug_utils_messenger_create_info = _vulkan_init_debug_messenger();
 	vk_instance_create_info.pNext = (VkDebugUtilsMessengerCreateInfoEXT*) &vk_debug_utils_messenger_create_info;
 #else
 	vk_instance_create_info.pNext = NULL;
-#endif // PHANTOM_DEBUG_VULKAN
+#endif // PHANTOM_DEBUG_GRAPHICS
 
 	if (vkCreateInstance(&vk_instance_create_info, NULL, &vulkan_app_data->instance) != VK_SUCCESS)
 	{
@@ -873,13 +992,13 @@ PHANTOM_API PVulkanAppData *p_vulkan_init(PVulkanAppRequest *vulkan_request_app)
 	e_dynarr_deinit(enabled_extensions);
 	e_dynarr_deinit(enabled_layers);
 
-#ifdef PHANTOM_DEBUG_VULKAN
+#ifdef PHANTOM_DEBUG_GRAPHICS
 	if (_vulkan_create_debug_utils_messenger(vulkan_app_data->instance, &vk_debug_utils_messenger_create_info, NULL,
 				&vulkan_app_data->debug_messenger) != VK_SUCCESS) {
 		e_log_message(E_LOG_ERROR, L"Vulkan General", L"Failed to set up debug messenger!");
 		exit(1);
 	}
-#endif // PHANTOM_DEBUG_VULKAN
+#endif // PHANTOM_DEBUG_GRAPHICS
 	return vulkan_app_data;
 }
 
@@ -890,21 +1009,22 @@ PHANTOM_API PVulkanAppData *p_vulkan_init(PVulkanAppRequest *vulkan_request_app)
  */
 PHANTOM_API void p_vulkan_deinit(PVulkanAppData *vulkan_app_data)
 {
-#ifdef PHANTOM_DEBUG_VULKAN
+#ifdef PHANTOM_DEBUG_GRAPHICS
 	_vulkan_destroy_debug_utils_messenger(vulkan_app_data->instance, vulkan_app_data->debug_messenger, NULL);
-#endif // PHANTOM_DEBUG_VULKAN
+#endif // PHANTOM_DEBUG_GRAPHICS
 	vkDestroyInstance(vulkan_app_data->instance, NULL);
 	free(vulkan_app_data);
 }
 
 /**
- * p_vulkan_surface_create
+ * p_vulkan_display_create
  *
  * Creates a vulkan surface based on the platform
  * and assigns it to window_data
  */
-PHANTOM_API void p_vulkan_surface_create(PWindowData *window_data, const PVulkanAppData * const vulkan_app_data,
-		const PVulkanDisplayRequest * const vulkan_display_request)
+PHANTOM_API
+void p_vulkan_display_create(PWindowData *window_data, const PGraphicalAppData * const vulkan_app_data,
+		const PGraphicalDisplayRequest * const vulkan_display_request)
 {
 	PVulkanDisplayData *vulkan_display_data = calloc(1, sizeof *vulkan_display_data);
 	vulkan_display_data->instance = vulkan_app_data->instance;
@@ -935,11 +1055,9 @@ PHANTOM_API void p_vulkan_surface_create(PWindowData *window_data, const PVulkan
 	}
 #endif
 
-	VkPhysicalDevice physical_device = p_vulkan_device_auto_pick(vulkan_display_data, vulkan_app_data,
+	PGraphicalDevice physical_device = p_vulkan_device_auto_pick(vulkan_display_data, vulkan_app_data,
 			vulkan_display_request, vulkan_display_data->surface);
-	physical_device = p_vulkan_device_auto_pick(vulkan_display_data, vulkan_app_data,
-			vulkan_display_request, vulkan_display_data->surface);
-	if (physical_device == VK_NULL_HANDLE)
+	if (physical_device.handle == VK_NULL_HANDLE)
 	{
 		e_log_message(E_LOG_ERROR, L"Vulkan General", L"Failed to find a suitable GPU!");
 		exit(1);
@@ -947,7 +1065,7 @@ PHANTOM_API void p_vulkan_surface_create(PWindowData *window_data, const PVulkan
 	p_vulkan_device_set(vulkan_display_data, vulkan_display_request,physical_device, vulkan_display_data->surface,
 			window_data);
 
-	window_data->vulkan_display_data = vulkan_display_data;
+	window_data->graphical_display_data = (PGraphicalDisplayData *)vulkan_display_data;
 }
 
 /**
@@ -955,7 +1073,8 @@ PHANTOM_API void p_vulkan_surface_create(PWindowData *window_data, const PVulkan
  *
  * Destroys the vulkan_display_data
  */
-PHANTOM_API void p_vulkan_surface_destroy(PVulkanDisplayData *vulkan_display_data)
+PHANTOM_API
+void p_vulkan_display_destroy(PVulkanDisplayData *vulkan_display_data)
 {
 	e_dynarr_deinit(vulkan_display_data->compatible_devices);
 	e_dynarr_deinit(vulkan_display_data->swapchain_images);

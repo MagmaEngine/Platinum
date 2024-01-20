@@ -143,9 +143,9 @@ PHANTOM_API void p_x11_window_set_name(PDisplayInfo *display_info, const wchar_t
  * p_x11_window_create
  *
  * creates a window with parameters set from window_request.
- * adds the window_data associated with the window to app_instance.
+ * adds the window_data associated with the window to app_data.
  */
-PHANTOM_API void p_x11_window_create(PAppInstance *app_instance, const PWindowRequest window_request)
+PHANTOM_API void p_x11_window_create(PAppData *app_data, const PWindowRequest window_request)
 {
 	// Create an XCB connection and window
 	xcb_connection_t *connection = xcb_connect(NULL, NULL);
@@ -276,16 +276,16 @@ PHANTOM_API void p_x11_window_create(PAppInstance *app_instance, const PWindowRe
 			exit(1);
 	}
 
-	p_vulkan_surface_create(window_data, app_instance->vulkan_app_data, &window_request.vulkan_display_request);
+	p_graphics_display_create(window_data, app_data->graphical_app_data, &window_request.graphical_display_request);
 
-	e_mutex_lock(app_instance->window_mutex);
-	e_dynarr_add(app_instance->window_data, &window_data);
-	e_mutex_unlock(app_instance->window_mutex);
+	e_mutex_lock(app_data->window_mutex);
+	e_dynarr_add(app_data->window_data, &window_data);
+	e_mutex_unlock(app_data->window_mutex);
 
 	// Start the window event manager
-	EThreadArguments args = malloc(sizeof (PAppInstance *) + sizeof (PWindowData *));
-	memcpy(args, &app_instance, sizeof (PAppInstance **));
-	memcpy(&((char *)args)[sizeof (PAppInstance **)], &window_data, sizeof (PWindowData **));
+	EThreadArguments args = malloc(sizeof (PAppData *) + sizeof (PWindowData *));
+	memcpy(args, &app_data, sizeof (PAppData **));
+	memcpy(&((char *)args)[sizeof (PAppData **)], &window_data, sizeof (PWindowData **));
 	window_data->event_manager = e_thread_create(p_x11_window_event_manage, args);
 }
 
@@ -307,18 +307,18 @@ PHANTOM_API void p_x11_window_close(PWindowData *window_data)
  *
  * internal close function that actually closes the window and frees data
  */
-static void _x11_window_close(PAppInstance *app_instance, PWindowData *window_data)
+static void _x11_window_close(PAppData *app_data, PWindowData *window_data)
 {
 	// If window exists delete it.
-	e_mutex_lock(app_instance->window_mutex);
-	int index = e_dynarr_find(app_instance->window_data, &window_data);
+	e_mutex_lock(app_data->window_mutex);
+	int index = e_dynarr_find(app_data->window_data, &window_data);
 	if (index == -1)
 	{
 		e_log_message(E_LOG_ERROR, L"Phantom", L"Window does not exist...");
 		exit(1);
 	}
 	PDisplayInfo *display_info = window_data->display_info;
-	p_vulkan_surface_destroy(window_data->vulkan_display_data);
+	p_graphics_display_destroy(window_data->graphical_display_data);
 	xcb_unmap_window(display_info->connection, display_info->window);
 	xcb_disconnect(display_info->connection);
 	free(window_data->display_info);
@@ -329,8 +329,8 @@ static void _x11_window_close(PAppInstance *app_instance, PWindowData *window_da
 		free(window_data);
 		e_thread_detach(e_thread_self());
 	}
-	e_dynarr_remove_unordered(app_instance->window_data, index);
-	e_mutex_unlock(app_instance->window_mutex);
+	e_dynarr_remove_unordered(app_data->window_data, index);
+	e_mutex_unlock(app_data->window_mutex);
 }
 
 /**
@@ -342,8 +342,8 @@ static void _x11_window_close(PAppInstance *app_instance, PWindowData *window_da
 static EThreadResult p_x11_window_event_manage(EThreadArguments args)
 {
 	// unpack args
-	PAppInstance *app_instance = ((PAppInstance **)args)[0];
-	PWindowData *window_data = *(PWindowData **)&((char *)args)[sizeof (PAppInstance **)];
+	PAppData *app_data = ((PAppData **)args)[0];
+	PWindowData *window_data = *(PWindowData **)&((char *)args)[sizeof (PAppData **)];
 	//PWindowData *window_data = ((PWindowData **)args)[1];
 	PDisplayInfo *display_info = window_data->display_info;
 	PEventCalls *event_calls = window_data->event_calls;
@@ -354,11 +354,11 @@ static EThreadResult p_x11_window_event_manage(EThreadArguments args)
 		if (!event)
 		{
 			e_log_message(E_LOG_WARNING, L"Phantom", L"Event was null...");
-			e_mutex_lock(app_instance->window_mutex);
+			e_mutex_lock(app_data->window_mutex);
 			if (window_data->status == P_WINDOW_STATUS_ALIVE)
 				window_data->status = P_WINDOW_STATUS_CLOSE;
-			e_mutex_unlock(app_instance->window_mutex);
-			_x11_window_close(app_instance, window_data);
+			e_mutex_unlock(app_data->window_mutex);
+			_x11_window_close(app_data, window_data);
 			break;
 		}
 		switch (event->response_type & ~0x80)
@@ -484,11 +484,11 @@ static EThreadResult p_x11_window_event_manage(EThreadArguments args)
 				if (event_calls->enable_destroy && event_calls->destroy != NULL)
 					event_calls->destroy();
 
-				e_mutex_lock(app_instance->window_mutex);
+				e_mutex_lock(app_data->window_mutex);
 				if (window_data->status == P_WINDOW_STATUS_ALIVE)
 					window_data->status = P_WINDOW_STATUS_CLOSE;
-				e_mutex_unlock(app_instance->window_mutex);
-				_x11_window_close(app_instance, window_data);
+				e_mutex_unlock(app_data->window_mutex);
+				_x11_window_close(app_data, window_data);
 
 				break;
 			}
