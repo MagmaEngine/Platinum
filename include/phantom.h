@@ -57,7 +57,6 @@ typedef struct {
 	VkSurfaceCapabilitiesKHR capabilities;
 	VkSurfaceFormatKHR *format; // pointer because NULL if none
 	VkPresentModeKHR *present_mode; // pointer because NULL if none
-
 } PVulkanSwapchainSupport;
 
 /**
@@ -85,7 +84,7 @@ enum PVulkanQueueType {
 };
 
 /**
- * PVulkanDataDisplay
+ * PVulkanDisplayData
  *
  * This struct contains data relevant to a vulkan display
  */
@@ -93,25 +92,49 @@ typedef struct {
 	VkSurfaceKHR surface;
 	VkPhysicalDevice current_physical_device;
 	VkDevice logical_device;
-	EDynarr *compatible_devices;
+	EDynarr *compatible_devices; // contains VkPhysicalDevice
 	PVulkanQueueFamilyInfo queue_family_infos[P_VULKAN_QUEUE_TYPE_MAX];
-	VkInstance instance; // non-malloced pointer to PVulkanDataApp->instance
+	VkInstance instance; // non-malloced pointer to PVulkanAppData->instance
 	VkSwapchainKHR swapchain;
 	VkExtent2D swapchain_extent;
 	VkFormat swapchain_format;
 	EDynarr *swapchain_images; // contains VkImage
 	EDynarr *swapchain_image_views; // contains VkImageView
-} PVulkanDataDisplay;
+} PVulkanDisplayData;
 
 /**
- * PVulkanDataApp
+ * PVulkanAppData
  *
  * This struct is the holds all the information for the app for vulkan to work properly
  */
 typedef struct {
 	VkInstance instance;
 	VkDebugUtilsMessengerEXT debug_messenger;
-} PVulkanDataApp;
+} PVulkanAppData;
+
+/**
+ * PVulkanAppRequest
+ *
+ * This struct is used to create a new vulkan app with the requested settings
+ */
+typedef struct {
+	EDynarr *required_extensions; // contains char *
+	EDynarr *required_layers; // contains char *
+} PVulkanAppRequest;
+
+/**
+ * PVulkanDisplayRequest
+ *
+ * This struct is used to create a new window surface with the requested settings
+ */
+typedef struct {
+	VkBool32 require_present;
+
+	VkQueueFlags required_queue_flags;
+	VkPhysicalDeviceFeatures required_features;
+	EDynarr *required_extensions; // contains char *
+	EDynarr *required_layers; // contains char *
+} PVulkanDisplayRequest;
 
 /**
  * PEventCalls
@@ -157,7 +180,7 @@ typedef struct {
 	EThread event_manager;
 	PEventCalls *event_calls;
 	PDisplayInfo *display_info;
-	PVulkanDataDisplay *vulkan_data_display;
+	PVulkanDisplayData *vulkan_display_data;
 } PWindowData;
 
 /**
@@ -174,45 +197,17 @@ typedef struct {
 	enum PWindowDisplayType display_type;
 	enum PWindowInteractType interact_type;
 	PEventCalls event_calls;
+	PVulkanDisplayRequest vulkan_display_request;
 } PWindowRequest;
 
 /**
- * PVulkanAppRequest
+ * PAppRequest
  *
- * This struct is used to create a new vulkan app with the requested settings
+ * This struct is used to create a new app with the requested settings
  */
 typedef struct {
-	bool debug;
-
-	// required vulkan features
-	EDynarr *required_extensions; // Names of required extensions
-	EDynarr *required_layers; // Names of required layers
-
-	// optional vulkan features
-	EDynarr *optional_extensions; // Names of optional extensions
-	EDynarr *optional_layers; // Names of optional layers
-} PVulkanAppRequest;
-
-/**
- * PVulkanDisplayRequest
- *
- * This struct is used to create a new window surface with the requested settings
- */
-typedef struct {
-	VkBool32 require_present;
-
-	// required vulkan features
-	VkQueueFlags required_queue_flags;
-	VkPhysicalDeviceFeatures required_features;
-	EDynarr *required_extensions; // Names of required extensions
-	EDynarr *required_layers; // Names of required layers
-
-	// optional vulkan features
-	VkQueueFlags optional_queue_flags;
-	VkPhysicalDeviceFeatures optional_features;
-	EDynarr *optional_extensions; // Names of optional extensions
-	EDynarr *optional_layers; // Names of optional layers
-} PVulkanDisplayRequest;
+	PVulkanAppRequest *vulkan_app_request;
+} PAppRequest;
 
 /**
  * PAppInstance
@@ -223,33 +218,29 @@ typedef struct {
 	EDynarr *window_data; // Array of (PWindowData *)
 	PDeviceManager *input_manager;
 	EMutex *window_mutex;
-	PVulkanDataApp *vulkan_data_app;
+	PVulkanAppData *vulkan_app_data;
 } PAppInstance;
 
 
 // Vulkan
-PVulkanDataApp *p_vulkan_init(PVulkanAppRequest *vulkan_request_app);
-void p_vulkan_deinit(PVulkanDataApp *vulkan_data_app);
+PHANTOM_API PVulkanAppData *p_vulkan_init(PVulkanAppRequest *vulkan_request_app);
+PHANTOM_API void p_vulkan_deinit(PVulkanAppData *vulkan_app_data);
 
-PVulkanAppRequest *p_vulkan_request_app_create(void);
-PVulkanDisplayRequest *p_vulkan_request_display_create(void);
-void p_vulkan_request_app_destroy(PVulkanAppRequest *vulkan_request_app);
-void p_vulkan_request_display_destroy(PVulkanDisplayRequest *vulkan_request_display);
+PHANTOM_API void p_vulkan_surface_create(PWindowData *window_data, const PVulkanAppData * const vulkan_app_data,
+		const PVulkanDisplayRequest * const vulkan_request_display);
 
-void p_vulkan_surface_create(PWindowData *window_data, PVulkanDataApp *vulkan_data_app,
-		PVulkanDisplayRequest *vulkan_request_display);
-void p_vulkan_surface_destroy(PVulkanDataDisplay *vulkan_data_display);
+PHANTOM_API void p_vulkan_surface_destroy(PVulkanDisplayData *vulkan_display_data);
 
 PHANTOM_API void p_vulkan_device_set(
-		PVulkanDataDisplay *vulkan_data_display,
+		PVulkanDisplayData *vulkan_display_data,
 		const PVulkanDisplayRequest * const vulkan_request_display,
 		const VkPhysicalDevice physical_device,
 		const VkSurfaceKHR surface,
 		const PWindowData * const window_data);
 
 PHANTOM_API VkPhysicalDevice p_vulkan_device_auto_pick(
-		PVulkanDataDisplay *vulkan_data_display,
-		const PVulkanDataApp * const vulkan_data_app,
+		PVulkanDisplayData *vulkan_display_data,
+		const PVulkanAppData * const vulkan_app_data,
 		const PVulkanDisplayRequest * const vulkan_request_display,
 		const VkSurfaceKHR surface);
 
@@ -364,7 +355,7 @@ struct PDeviceManager {
 #define p_app_init p_linux_app_init
 #define p_app_deinit p_linux_app_deinit
 
-PHANTOM_API PAppInstance *p_linux_app_init(void);
+PHANTOM_API PAppInstance *p_linux_app_init(PAppRequest app_request);
 PHANTOM_API void p_linux_app_deinit(PAppInstance *app_instance);
 
 // Event
@@ -436,7 +427,7 @@ struct PDeviceManager {
 #define p_app_init p_windows_app_init
 #define p_app_deinit p_windows_app_deinit
 
-PHANTOM_API PAppInstance *p_windows_app_init(void);
+PHANTOM_API PAppInstance *p_windows_app_init(PAppRequest app_request);
 PHANTOM_API void p_windows_app_deinit(PAppInstance *app_instance);
 
 // Event

@@ -329,9 +329,7 @@ static EThreadResult WINAPI p_win32_window_event_manage(EThreadArguments args)
 			exit(1);
 	}
 
-	PVulkanDisplayRequest *vulkan_request_display = p_vulkan_request_display_create();
-	p_vulkan_surface_create(window_data, app_instance->vulkan_data_app, vulkan_request_display);
-	p_vulkan_request_display_destroy(vulkan_request_display);
+	p_vulkan_surface_create(window_data, app_instance->vulkan_app_data, &window_request.vulkan_display_request);
 
 	e_mutex_lock(app_instance->window_mutex);
 	e_dynarr_add(app_instance->window_data, &window_data);
