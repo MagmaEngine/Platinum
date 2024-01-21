@@ -199,10 +199,10 @@ PHANTOM_API void p_x11_window_create(PAppData *app_data, const PWindowRequest wi
 	PWindowData *window_data = malloc(sizeof *window_data);
 	window_data->name = malloc((wcslen(window_request.name)+1) * sizeof(wchar_t));
 	wcscpy(window_data->name, window_request.name);
-	window_data->x = e_mini(e_maxi(window_request.x, 0), screen->width_in_pixels);
-	window_data->y = e_mini(e_maxi(window_request.y, 0), screen->height_in_pixels);
-	window_data->width = e_mini(e_maxi(window_request.width, 1), screen->width_in_pixels);
-	window_data->height = e_mini(e_maxi(window_request.height, 1), screen->width_in_pixels);
+	window_data->x = E_MIN(E_MAX(window_request.x, 0), screen->width_in_pixels);
+	window_data->y = E_MIN(E_MAX(window_request.y, 0), screen->height_in_pixels);
+	window_data->width = E_MIN(E_MAX(window_request.width, 1), screen->width_in_pixels);
+	window_data->height = E_MIN(E_MAX(window_request.height, 1), screen->width_in_pixels);
 	window_data->display_type = window_request.display_type;
 	window_data->interact_type = window_request.interact_type;
 	window_data->display_info = display_info;

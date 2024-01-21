@@ -529,12 +529,12 @@ static void _vulkan_swapchain_create(
 {
 
 	// Set extent
-	vulkan_display_data->swapchain_extent.width = e_mini(
-			e_maxi(framebuffer_width, swapchain_support.capabilities.minImageExtent.width),
+	vulkan_display_data->swapchain_extent.width = E_MIN(
+			E_MAX(framebuffer_width, swapchain_support.capabilities.minImageExtent.width),
 			swapchain_support.capabilities.maxImageExtent.width);
 
-	vulkan_display_data->swapchain_extent.height = e_mini(
-			e_maxi(framebuffer_height, swapchain_support.capabilities.minImageExtent.height),
+	vulkan_display_data->swapchain_extent.height = E_MIN(
+			E_MAX(framebuffer_height, swapchain_support.capabilities.minImageExtent.height),
 			swapchain_support.capabilities.maxImageExtent.height);
 
 	// Save format for later
