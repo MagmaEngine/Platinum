@@ -76,6 +76,8 @@ elif library_buildtype == 'static'
     install : false)
 endif
 
+subdir('shaders')
+
 dep_libphantom = declare_dependency(
   include_directories: include_directories('include'),
   link_with : libphantom)
