@@ -82,6 +82,8 @@ typedef struct {
 	VkFormat swapchain_format;
 	EDynarr *swapchain_images; // contains VkImage
 	EDynarr *swapchain_image_views; // contains VkImageView
+
+	EDynarr *shaders; // contains VkShaderModule. TODO: move this to renderer
 } PVulkanDisplayData;
 
 /**

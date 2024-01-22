@@ -1017,6 +1017,29 @@ PHANTOM_API void p_vulkan_deinit(PVulkanAppData *vulkan_app_data)
 }
 
 /**
+ * _create_shader_module
+ *
+ * TODO: move me into renderer
+ */
+VkShaderModule _create_shader_module(PVulkanDisplayData *vulkan_display_data, const char *shader_data,
+		uint shader_data_size)
+{
+	VkShaderModule shader_module;
+	VkShaderModuleCreateInfo create_info = {0};
+	create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	create_info.codeSize = shader_data_size;
+	create_info.pCode = (uint32_t *)shader_data;
+	if (vkCreateShaderModule(vulkan_display_data->logical_device, &create_info, NULL, &shader_module)
+			!= VK_SUCCESS)
+	{
+		e_log_message(E_LOG_ERROR, L"Vulkan General", L"Failed to create shader module!");
+		exit(1);
+	}
+	return shader_module;
+}
+
+
+/**
  * p_vulkan_display_create
  *
  * Creates a vulkan surface based on the platform
@@ -1066,6 +1089,44 @@ void p_vulkan_display_create(PWindowData *window_data, const PGraphicalAppData *
 			window_data);
 
 	window_data->graphical_display_data = (PGraphicalDisplayData *)vulkan_display_data;
+
+	// TODO: refactor this to get shader path from config, also put render stuff in renderer
+	char *shader_vert_path = "build/src/phantom/shaders/shader_vert.spv";
+	uint shader_vert_size = e_file_get_size(shader_vert_path);
+	char *shader_vert_data = malloc(shader_vert_size * sizeof(char));
+	e_file_read(shader_vert_path, shader_vert_data, shader_vert_size);
+
+	char *shader_frag_path = "build/src/phantom/shaders/shader_frag.spv";
+	uint shader_frag_size = e_file_get_size(shader_frag_path);
+	char *shader_frag_data = malloc(shader_frag_size * sizeof(char));
+	e_file_read(shader_frag_path, shader_frag_data, shader_frag_size);
+
+
+	if (vulkan_display_data->shaders != NULL)
+		e_dynarr_deinit(vulkan_display_data->shaders);
+	vulkan_display_data->shaders = e_dynarr_init(sizeof (VkShaderModule), 2);
+
+	VkShaderModule vertShaderModule = _create_shader_module(vulkan_display_data, shader_vert_data, shader_vert_size);
+	VkShaderModule fragShaderModule = _create_shader_module(vulkan_display_data, shader_frag_data, shader_frag_size);
+	free(shader_vert_data);
+	free(shader_frag_data);
+
+	e_dynarr_add(vulkan_display_data->shaders, &vertShaderModule);
+	e_dynarr_add(vulkan_display_data->shaders, &fragShaderModule);
+
+	VkPipelineShaderStageCreateInfo vertShaderStageInfo = {0};
+	vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+	vertShaderStageInfo.module = vertShaderModule;
+	vertShaderStageInfo.pName = "main";
+
+	VkPipelineShaderStageCreateInfo fragShaderStageInfo = {0};
+	fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	fragShaderStageInfo.module = fragShaderModule;
+	fragShaderStageInfo.pName = "main";
+
+	VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
 }
 
 /**
@@ -1076,12 +1137,20 @@ void p_vulkan_display_create(PWindowData *window_data, const PGraphicalAppData *
 PHANTOM_API
 void p_vulkan_display_destroy(PVulkanDisplayData *vulkan_display_data)
 {
+
+	for (uint i = 0; i < vulkan_display_data->shaders->num_items; i++)
+		vkDestroyShaderModule(vulkan_display_data->logical_device,
+				E_DYNARR_GET(vulkan_display_data->shaders, VkShaderModule, i), NULL);
+	e_dynarr_deinit(vulkan_display_data->shaders);
+
 	e_dynarr_deinit(vulkan_display_data->compatible_devices);
 	e_dynarr_deinit(vulkan_display_data->swapchain_images);
+
 	for (uint i = 0; i < vulkan_display_data->swapchain_image_views->num_items; i++)
 		vkDestroyImageView(vulkan_display_data->logical_device,
 				E_DYNARR_GET(vulkan_display_data->swapchain_image_views, VkImageView, i), NULL);
 	e_dynarr_deinit(vulkan_display_data->swapchain_image_views);
+
 	vkDestroySwapchainKHR(vulkan_display_data->logical_device, vulkan_display_data->swapchain, NULL);
 	vkDestroySurfaceKHR(vulkan_display_data->instance, vulkan_display_data->surface, NULL);
 	vkDestroyDevice(vulkan_display_data->logical_device, NULL);
