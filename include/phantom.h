@@ -22,6 +22,11 @@
 #include "p_platform_windows.h"
 #endif // PHANTOM_PLATFORM_WINDOWS
 
+// Configuration data
+typedef struct {
+	char *shader_path;
+} PAppConfig;
+
 
 // Graphics
 
@@ -148,6 +153,7 @@ struct PWindowRequest {
  */
 struct PAppRequest {
 	PGraphicalAppRequest graphical_app_request;
+	PAppConfig *app_config;
 };
 
 /**
@@ -156,6 +162,7 @@ struct PAppRequest {
  * This struct is the holds all the information for the app for a GUI to work properly
  */
 struct PAppData {
+	PAppConfig *app_config;
 	EDynarr *window_data; // Array of (PWindowData *)
 	PDeviceManager *input_manager;
 	EMutex *window_mutex;

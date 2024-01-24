@@ -8,6 +8,8 @@ glsl_sources = [
   'shader.frag',
   ]
 
+phantom_shader_install_path = 'share/DarkEngine/shaders'
+
 foreach shader : glsl_sources
   shader_output = shader.replace('.vert', '_vert.spv').replace('.frag', '_frag.spv')
   #shader = src_dir + '/' + shader
@@ -18,6 +20,6 @@ foreach shader : glsl_sources
     command : [glsl_compiler, '-V', '@INPUT@', '-o', '@OUTPUT@'],
     build_by_default : true,
     install : true,
-    install_dir : 'share/DarkEngine/shaders',
+    install_dir : phantom_shader_install_path,
     )
 endforeach

@@ -1,5 +1,6 @@
 #include "phantom.h"
 #include <locale.h>
+#include <string.h>
 
 EMutex debug_memory_mutex;
 
@@ -17,6 +18,8 @@ PHANTOM_API PAppData *p_linux_app_init(PAppRequest app_request)
 	e_debug_memory_init(&debug_memory_mutex);
 
 	PAppData *app_data = malloc(sizeof *app_data);
+	app_data->app_config = app_request.app_config;
+	//memcpy(&app_data->app_config, &app_request.app_config, sizeof app_request.app_config);
 
 	// init window mutex
 	app_data->window_mutex = malloc(sizeof *app_data->window_mutex);

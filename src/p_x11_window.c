@@ -3,74 +3,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <wchar.h>
-#include <xcb/xcb_image.h>
 
 static EThreadResult p_x11_window_event_manage(EThreadArguments args);
 
 // the pattern (free)(x) comes up a few times in this code. It is only used to bypass the memory debugger macros
 // which will error because the data is malloc'd in a library call instead of in-code
-
-/**
- * _resize_pixmap
- *
- * internal helper function that resizes the pixelmap
- * to the dimensions specified by window_data
- */
-static void _resize_pixmap(PWindowData *window_data) {
-	// Create a new pixmap with the desired dimensions
-	xcb_connection_t *connection = window_data->display_info->connection;
-	xcb_pixmap_t pixmap = window_data->display_info->pixmap;
-	xcb_gcontext_t graphics_context = window_data->display_info->graphics_context;
-	xcb_pixmap_t new_pixmap = xcb_generate_id(connection);
-	xcb_create_pixmap(connection, 24, new_pixmap, pixmap, window_data->width, window_data->height);
-
-	// Copy the content from the old pixmap to the new one
-	xcb_copy_area(connection, pixmap, new_pixmap, graphics_context, 0, 0, 0, 0, window_data->width,
-			window_data->height);
-
-	// Free the old pixmap
-	xcb_free_pixmap(connection, pixmap);
-
-	// Update the pixmap variable with the new pixmap
-	window_data->display_info->pixmap = new_pixmap;
-}
-
-/**
- * draw_stuff
- *
- * a test function for graphics that should be deleted as soon as vulkan is setup
- */
-static void draw_stuff(PDisplayInfo *display_info) {
-	xcb_connection_t *connection = display_info->connection;
-	xcb_gcontext_t graphics_context = display_info->graphics_context;
-	xcb_pixmap_t pixmap = display_info->pixmap;
-
-	// Create an image
-	uint width = 0xFF;
-	uint height = 0xFF;
-	xcb_image_t *image = xcb_image_create_native(connection, width, height, XCB_IMAGE_FORMAT_Z_PIXMAP, 24, NULL, 0, NULL);
-
-	// Draw something on the image (for example, a red rectangle)
-	for (uint y = 0; y < height; ++y) {
-		for (uint x = 0; x < width; ++x) {
-			uint32_t pixel = (x << 16) | (y << 8);
-			//e_log_message(E_LOG_INFO, L"Phantom", L"0x%.8X", pixel);
-			xcb_image_put_pixel(image, x, y, pixel);
-		}
-	}
-
-	// Put the image onto the pixmap
-	xcb_image_put(connection, pixmap, graphics_context, image, 0, 0, 0);
-
-	// Draw the pixmap onto the window
-	xcb_copy_area(connection, pixmap, display_info->window, graphics_context, 0, 0, 0, 0, width, height);
-
-	// Flush the request
-	xcb_flush(connection);
-
-	// Free resources
-	xcb_image_destroy(image);
-}
 
 /**
  * p_x11_generate_atom
@@ -366,7 +303,6 @@ static EThreadResult p_x11_window_event_manage(EThreadArguments args)
 			// TODO: experiment with capturing mouse and keyboard
 			case XCB_EXPOSE:
 			{
-				draw_stuff(display_info);
 				xcb_expose_event_t *expose_event = (xcb_expose_event_t *)event;
 				E_UNUSED(expose_event);
 				// TODO: redraw (only new part?)
@@ -381,7 +317,6 @@ static EThreadResult p_x11_window_event_manage(EThreadArguments args)
 				window_data->y = config_notify_event->y;
 				window_data->width = config_notify_event->width;
 				window_data->height = config_notify_event->height;
-				_resize_pixmap(window_data);
 				if (event_calls->enable_configure && event_calls->configure != NULL)
 					event_calls->configure();
 				break;

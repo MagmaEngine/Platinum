@@ -1130,7 +1130,7 @@ void p_vulkan_display_create(PWindowData *window_data, const PGraphicalAppData *
 }
 
 /**
- * p_vulkan_surface_destroy
+ * p_vulkan_display_destroy
  *
  * Destroys the vulkan_display_data
  */

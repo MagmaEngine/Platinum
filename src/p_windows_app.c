@@ -30,6 +30,7 @@ PHANTOM_API PAppData *p_windows_app_init(PAppRequest app_request)
 
 
 	PAppData *app_data = malloc(sizeof *app_data);
+	app_data->app_config = app_request.app_config;
 
 	// init window mutex
 	app_data->window_mutex = malloc(sizeof *app_data->window_mutex);
