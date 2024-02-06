@@ -1,4 +1,4 @@
-#include "phantom.h"
+#include "platinum.h"
 #include <libudev.h>
 #include <libevdev/libevdev.h>
 #include <libevdev/libevdev-uinput.h>

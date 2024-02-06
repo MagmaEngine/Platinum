@@ -1,11 +1,11 @@
-#include "phantom.h"
+#include "platinum.h"
 #include <string.h>
 
-#ifdef PHANTOM_DISPLAY_X11
+#ifdef PLATINUM_DISPLAY_X11
 #include <vulkan/vulkan_xcb.h>
-#elif defined PHANTOM_DISPLAY_WIN32
+#elif defined PLATINUM_DISPLAY_WIN32
 #include <vulkan/vulkan_win32.h>
-#endif // PHANTOM_DISPLAY_XXXXXX
+#endif // PLATINUM_DISPLAY_XXXXXX
 
 /**
  * _vulkan_app_request_convert
@@ -23,25 +23,25 @@ PVulkanAppRequest *_vulkan_app_request_convert(const PGraphicalAppRequest * cons
 	{
 		e_dynarr_add(vulkan_app_request->required_extensions, E_VOID_PTR_FROM_VALUE(char *,
 					VK_KHR_SURFACE_EXTENSION_NAME));
-#ifdef PHANTOM_DISPLAY_X11
+#ifdef PLATINUM_DISPLAY_X11
 		e_dynarr_add(vulkan_app_request->required_extensions, E_VOID_PTR_FROM_VALUE(char *,
 					VK_KHR_XCB_SURFACE_EXTENSION_NAME));
-#endif // PHANTOM_DISPLAY_X11
-#ifdef PHANTOM_DISPLAY_WIN32
+#endif // PLATINUM_DISPLAY_X11
+#ifdef PLATINUM_DISPLAY_WIN32
 		e_dynarr_add(vulkan_app_data->required_extensions, E_VOID_PTR_FROM_VALUE(char *,
 					VK_KHR_WIN32_SURFACE_EXTENSION_NAME));
-#endif // PHANTOM_DISPLAY_WIN32
+#endif // PLATINUM_DISPLAY_WIN32
 	}
-#ifdef PHANTOM_DEBUG_GRAPHICS
+#ifdef PLATINUM_DEBUG_GRAPHICS
 	e_dynarr_add(vulkan_app_request->required_extensions, E_VOID_PTR_FROM_VALUE(char *,
 				VK_EXT_DEBUG_UTILS_EXTENSION_NAME));
-#endif // PHANTOM_DEBUG_GRAPHICS
+#endif // PLATINUM_DEBUG_GRAPHICS
 
 	// layers
 	vulkan_app_request->required_layers = e_dynarr_init(sizeof(char *), 1);
-#ifdef PHANTOM_DEBUG_GRAPHICS
+#ifdef PLATINUM_DEBUG_GRAPHICS
 	e_dynarr_add(vulkan_app_request->required_layers, E_VOID_PTR_FROM_VALUE(char *, "VK_LAYER_KHRONOS_validation"));
-#endif // PHANTOM_DEBUG_GRAPHICS
+#endif // PLATINUM_DEBUG_GRAPHICS
 	return vulkan_app_request;
 }
 
@@ -80,10 +80,10 @@ PVulkanDisplayRequest *_vulkan_display_request_convert(const PGraphicalDisplayRe
 	}
 	// layers
 	vulkan_display_request->required_layers = e_dynarr_init(sizeof(char *), 1);
-#ifdef PHANTOM_DEBUG_GRAPHICS
+#ifdef PLATINUM_DEBUG_GRAPHICS
 	e_dynarr_add(vulkan_display_request->required_layers, E_VOID_PTR_FROM_VALUE(char *,
 				"VK_LAYER_KHRONOS_validation"));
-#endif // PHANTOM_DEBUG_GRAPHICS
+#endif // PLATINUM_DEBUG_GRAPHICS
 	vulkan_display_request->required_queue_flags = VK_QUEUE_GRAPHICS_BIT;
 	vulkan_display_request->required_features = (VkPhysicalDeviceFeatures){0};
 	vulkan_display_request->required_features.geometryShader = true;
@@ -95,7 +95,7 @@ PVulkanDisplayRequest *_vulkan_display_request_convert(const PGraphicalDisplayRe
  *
  * deinits data created as a part of request init
  */
-PHANTOM_API void _vulkan_display_request_destroy(PVulkanDisplayRequest *vulkan_display_request)
+PLATINUM_API void _vulkan_display_request_destroy(PVulkanDisplayRequest *vulkan_display_request)
 {
 	e_dynarr_deinit(vulkan_display_request->required_extensions);
 	e_dynarr_deinit(vulkan_display_request->required_layers);
@@ -695,7 +695,7 @@ static PVulkanSwapchainSupport _vulkan_swapchain_auto_pick(const VkPhysicalDevic
  * sets the physical device to use in vulkan_display_data from physical_device
  * also creates a logical device with vulkan_app_request and sets it to vulkan_display_data
  */
-PHANTOM_API
+PLATINUM_API
 void p_vulkan_device_set(
 		PGraphicalDisplayData *graphical_display_data,
 		const PGraphicalDisplayRequest * const graphical_display_request,
@@ -846,7 +846,7 @@ void p_vulkan_device_set(
  * picks the physical device for use with vulkan and returns it
  * returns VK_NULL_HANDLE if no suitable device is found
  */
-PHANTOM_API
+PLATINUM_API
 PGraphicalDevice p_vulkan_device_auto_pick(
 		PGraphicalDisplayData *graphical_display_data,
 		const PGraphicalAppData * const graphical_app_data,
@@ -942,15 +942,15 @@ end_device_score_eval:
  *
  * Initializes vulkan and sets the result in app_instance
  */
-PHANTOM_API PGraphicalAppData *p_vulkan_init(PGraphicalAppRequest *graphical_app_request)
+PLATINUM_API PGraphicalAppData *p_vulkan_init(PGraphicalAppRequest *graphical_app_request)
 {
 	PVulkanAppRequest *vulkan_app_request = _vulkan_app_request_convert(graphical_app_request);
 	PGraphicalAppData *vulkan_app_data = malloc(sizeof *vulkan_app_data);
 
-#ifdef PHANTOM_DEBUG_GRAPHICS
+#ifdef PLATINUM_DEBUG_GRAPHICS
 	p_vulkan_list_available_extensions();
 	p_vulkan_list_available_layers();
-#endif // PHANTOM_DEBUG_GRAPHICS
+#endif // PLATINUM_DEBUG_GRAPHICS
 
 	// create vulkan instance
 	VkApplicationInfo vk_app_info = {0};
@@ -977,12 +977,12 @@ PHANTOM_API PGraphicalAppData *p_vulkan_init(PGraphicalAppRequest *graphical_app
 
 	_vulkan_app_request_destroy(vulkan_app_request);
 
-#ifdef PHANTOM_DEBUG_GRAPHICS
+#ifdef PLATINUM_DEBUG_GRAPHICS
 	VkDebugUtilsMessengerCreateInfoEXT vk_debug_utils_messenger_create_info = _vulkan_init_debug_messenger();
 	vk_instance_create_info.pNext = (VkDebugUtilsMessengerCreateInfoEXT*) &vk_debug_utils_messenger_create_info;
 #else
 	vk_instance_create_info.pNext = NULL;
-#endif // PHANTOM_DEBUG_GRAPHICS
+#endif // PLATINUM_DEBUG_GRAPHICS
 
 	if (vkCreateInstance(&vk_instance_create_info, NULL, &vulkan_app_data->instance) != VK_SUCCESS)
 	{
@@ -992,13 +992,13 @@ PHANTOM_API PGraphicalAppData *p_vulkan_init(PGraphicalAppRequest *graphical_app
 	e_dynarr_deinit(enabled_extensions);
 	e_dynarr_deinit(enabled_layers);
 
-#ifdef PHANTOM_DEBUG_GRAPHICS
+#ifdef PLATINUM_DEBUG_GRAPHICS
 	if (_vulkan_create_debug_utils_messenger(vulkan_app_data->instance, &vk_debug_utils_messenger_create_info, NULL,
 				&vulkan_app_data->debug_messenger) != VK_SUCCESS) {
 		e_log_message(E_LOG_ERROR, L"Vulkan General", L"Failed to set up debug messenger!");
 		exit(1);
 	}
-#endif // PHANTOM_DEBUG_GRAPHICS
+#endif // PLATINUM_DEBUG_GRAPHICS
 	return vulkan_app_data;
 }
 
@@ -1007,11 +1007,11 @@ PHANTOM_API PGraphicalAppData *p_vulkan_init(PGraphicalAppRequest *graphical_app
  *
  * Deinitializes vulkan
  */
-PHANTOM_API void p_vulkan_deinit(PVulkanAppData *vulkan_app_data)
+PLATINUM_API void p_vulkan_deinit(PVulkanAppData *vulkan_app_data)
 {
-#ifdef PHANTOM_DEBUG_GRAPHICS
+#ifdef PLATINUM_DEBUG_GRAPHICS
 	_vulkan_destroy_debug_utils_messenger(vulkan_app_data->instance, vulkan_app_data->debug_messenger, NULL);
-#endif // PHANTOM_DEBUG_GRAPHICS
+#endif // PLATINUM_DEBUG_GRAPHICS
 	vkDestroyInstance(vulkan_app_data->instance, NULL);
 	free(vulkan_app_data);
 }
@@ -1045,14 +1045,14 @@ VkShaderModule _create_shader_module(PVulkanDisplayData *vulkan_display_data, co
  * Creates a vulkan surface based on the platform
  * and assigns it to window_data
  */
-PHANTOM_API
+PLATINUM_API
 void p_vulkan_display_create(PWindowData *window_data, const PGraphicalAppData * const vulkan_app_data,
 		const PGraphicalDisplayRequest * const vulkan_display_request)
 {
 	PVulkanDisplayData *vulkan_display_data = calloc(1, sizeof *vulkan_display_data);
 	vulkan_display_data->instance = vulkan_app_data->instance;
 
-#ifdef PHANTOM_DISPLAY_X11
+#ifdef PLATINUM_DISPLAY_X11
 	VkXcbSurfaceCreateInfoKHR vk_surface_create_info = {0};
 	vk_surface_create_info.sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR;
 	vk_surface_create_info.connection = window_data->display_info->connection;
@@ -1063,9 +1063,9 @@ void p_vulkan_display_create(PWindowData *window_data, const PGraphicalAppData *
 		e_log_message(E_LOG_ERROR, L"Vulkan General", L"Failed to create XCB surface!");
 		exit(1);
 	}
-#elif defined PHANTOM_DISPLAY_WAYLAND
+#elif defined PLATINUM_DISPLAY_WAYLAND
 	// TODO: implement me
-#elif defined PHANTOM_DISPLAY_WIN32
+#elif defined PLATINUM_DISPLAY_WIN32
 	VkWin32SurfaceCreateInfoKHR vk_surface_create_info;
 	vk_surface_create_info.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
 	vk_surface_create_info.hwnd = window_data->display_info->hwnd;
@@ -1091,12 +1091,12 @@ void p_vulkan_display_create(PWindowData *window_data, const PGraphicalAppData *
 	window_data->graphical_display_data = (PGraphicalDisplayData *)vulkan_display_data;
 
 	// TODO: refactor this to get shader path from config, also put render stuff in renderer
-	char *shader_vert_path = "build/src/phantom/shaders/shader_vert.spv";
+	char *shader_vert_path = "build/src/platinum/shaders/shader_vert.spv";
 	uint shader_vert_size = e_file_get_size(shader_vert_path);
 	char *shader_vert_data = malloc(shader_vert_size * sizeof(char));
 	e_file_read(shader_vert_path, shader_vert_data, shader_vert_size);
 
-	char *shader_frag_path = "build/src/phantom/shaders/shader_frag.spv";
+	char *shader_frag_path = "build/src/platinum/shaders/shader_frag.spv";
 	uint shader_frag_size = e_file_get_size(shader_frag_path);
 	char *shader_frag_data = malloc(shader_frag_size * sizeof(char));
 	e_file_read(shader_frag_path, shader_frag_data, shader_frag_size);
@@ -1127,6 +1127,40 @@ void p_vulkan_display_create(PWindowData *window_data, const PGraphicalAppData *
 	fragShaderStageInfo.pName = "main";
 
 	VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
+
+	VkDynamicState dynamicStates[2] = {
+		VK_DYNAMIC_STATE_VIEWPORT,
+		VK_DYNAMIC_STATE_SCISSOR
+	};
+
+	VkPipelineDynamicStateCreateInfo dynamicState = {0};
+	dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+	dynamicState.dynamicStateCount = 2;
+	dynamicState.pDynamicStates = dynamicStates;
+
+	VkPipelineVertexInputStateCreateInfo vertexInputInfo = {0};
+	vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+	vertexInputInfo.vertexBindingDescriptionCount = 0;
+	vertexInputInfo.pVertexBindingDescriptions = NULL; // Optional
+	vertexInputInfo.vertexAttributeDescriptionCount = 0;
+	vertexInputInfo.pVertexAttributeDescriptions = NULL; // Optional
+
+	VkPipelineInputAssemblyStateCreateInfo inputAssembly = {0};
+	inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+	inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	inputAssembly.primitiveRestartEnable = VK_FALSE;
+
+	VkViewport viewport = {0};
+	viewport.x = 0.0f;
+	viewport.y = 0.0f;
+	viewport.width = (float) vulkan_display_data->swapchain_extent.width;
+	viewport.height = (float) vulkan_display_data->swapchain_extent.height;
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+
+	VkRect2D scissor = {0};
+	scissor.offset = (VkOffset2D){0, 0};
+	scissor.extent = vulkan_display_data->swapchain_extent;
 }
 
 /**
@@ -1134,7 +1168,7 @@ void p_vulkan_display_create(PWindowData *window_data, const PGraphicalAppData *
  *
  * Destroys the vulkan_display_data
  */
-PHANTOM_API
+PLATINUM_API
 void p_vulkan_display_destroy(PVulkanDisplayData *vulkan_display_data)
 {
 

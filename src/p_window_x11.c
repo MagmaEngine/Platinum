@@ -1,10 +1,59 @@
-#include "phantom.h"
+#include "platinum.h"
 #include <enigma.h>
 #include <stdlib.h>
 #include <string.h>
 #include <wchar.h>
 
-static EThreadResult p_x11_window_event_manage(EThreadArguments args);
+#include <xcb/xcb.h>
+
+// Internal Enums
+
+/**
+ * PAtomTypes
+ *
+ * This enum is used to initialize the display_info atoms
+ * for quick lookup later
+ */
+enum PAtomTypes {
+	P_ATOM_UTF8_STRING,
+	P_ATOM_NET_WM_NAME,
+	P_ATOM_NET_WM_STATE,
+	P_ATOM_NET_WM_STATE_FULLSCREEN,
+	P_ATOM_NET_WM_DECORATION,
+	P_ATOM_NET_WM_DECORATION_ALL,
+	P_ATOM_NET_WM_WINDOW_TYPE,
+	P_ATOM_NET_WM_WINDOW_TYPE_NORMAL,
+	P_ATOM_NET_WM_WINDOW_TYPE_DIALOG,
+	P_ATOM_NET_WM_WINDOW_TYPE_DOCK,
+	P_ATOM_MOTIF_WM_HINTS,
+	P_ATOM_MAX
+};
+
+// Internal Structs
+
+/**
+ * PDisplayInfo
+ *
+ * This struct holds all the low-level display information
+ * Values here should never be set directly
+ */
+struct PDisplayInfo {
+	// X info
+	xcb_atom_t atoms[P_ATOM_MAX];
+	xcb_connection_t *connection;
+	xcb_screen_t *screen;
+	xcb_window_t window;
+
+	// Window graphics
+	xcb_gcontext_t graphics_context;
+	xcb_pixmap_t pixmap;
+};
+
+// Internal Variables
+
+// Internal Functions
+
+static PThreadResult p_x11_window_event_manage(PThreadArguments args);
 
 // the pattern (free)(x) comes up a few times in this code. It is only used to bypass the memory debugger macros
 // which will error because the data is malloc'd in a library call instead of in-code
@@ -20,7 +69,7 @@ static xcb_atom_t p_x11_generate_atom(xcb_connection_t *connection, const char *
 	xcb_intern_atom_cookie_t cookie = xcb_intern_atom(connection, 0, strlen(atom_name), atom_name);
 	xcb_intern_atom_reply_t *reply = xcb_intern_atom_reply(connection, cookie, NULL);
 	if (!reply) {
-		e_log_message(E_LOG_ERROR, L"Phantom", L"Could not get atom reply...");
+		p_log_message(P_LOG_ERROR, L"Phantom", L"Could not get atom reply...");
 		exit(1);
 	}
 	xcb_atom_t atom = reply->atom;
@@ -34,7 +83,7 @@ static xcb_atom_t p_x11_generate_atom(xcb_connection_t *connection, const char *
  * updates window_data with the values provided as x, y, width, and heigth
  * and submits a request to the WM to resize the window
  */
-PHANTOM_API void p_x11_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height)
+void p_x11_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height)
 {
 	// resize
 	uint32_t params[4] = {x, y, width, height};
@@ -48,7 +97,7 @@ PHANTOM_API void p_x11_window_set_dimensions(PDisplayInfo *display_info, uint x,
  *
  * sets the name of the window
 */
-PHANTOM_API void p_x11_window_set_name(PDisplayInfo *display_info, const wchar_t *name)
+void p_x11_window_set_name(PDisplayInfo *display_info, const wchar_t *name)
 {
 	// convert name to char*
 	size_t utf8_size = wcstombs(NULL, name, 0);
@@ -82,7 +131,7 @@ PHANTOM_API void p_x11_window_set_name(PDisplayInfo *display_info, const wchar_t
  * creates a window with parameters set from window_request.
  * adds the window_data associated with the window to app_data.
  */
-PHANTOM_API void p_x11_window_create(PAppData *app_data, const PWindowRequest window_request)
+void p_x11_window_create(PAppData *app_data, const PWindowRequest window_request)
 {
 	// Create an XCB connection and window
 	xcb_connection_t *connection = xcb_connect(NULL, NULL);
@@ -90,7 +139,7 @@ PHANTOM_API void p_x11_window_create(PAppData *app_data, const PWindowRequest wi
 	// Check if the connection was successful
 	if (xcb_connection_has_error(connection))
 	{
-		e_log_message(E_LOG_ERROR, L"Phantom", L"Unable to open the connection to the X server");
+		p_log_message(P_LOG_ERROR, L"Phantom", L"Unable to open the connection to the X server");
 		exit(1);
 	}
 
@@ -125,7 +174,7 @@ PHANTOM_API void p_x11_window_create(PAppData *app_data, const PWindowRequest wi
 	{
 		if (display_info->atoms[i] == XCB_ATOM_NONE)
 		{
-			e_log_message(E_LOG_ERROR, L"Phantom", L"XCB atoms not initialized. Aborting...");
+			p_log_message(P_LOG_ERROR, L"Phantom", L"XCB atoms not initialized. Aborting...");
 			exit(1);
 		}
 	}
@@ -209,21 +258,21 @@ PHANTOM_API void p_x11_window_create(PAppData *app_data, const PWindowRequest wi
 		break;
 
 		case P_DISPLAY_MAX:
-			e_log_message(E_LOG_WARNING, L"Phantom", L"P_DISPLAY_MAX is not a valid window type...");
+			p_log_message(P_LOG_WARNING, L"Phantom", L"P_DISPLAY_MAX is not a valid window type...");
 			exit(1);
 	}
 
 	p_graphics_display_create(window_data, app_data->graphical_app_data, &window_request.graphical_display_request);
 
-	e_mutex_lock(app_data->window_mutex);
+	p_mutex_lock(app_data->window_mutex);
 	e_dynarr_add(app_data->window_data, &window_data);
-	e_mutex_unlock(app_data->window_mutex);
+	p_mutex_unlock(app_data->window_mutex);
 
 	// Start the window event manager
-	EThreadArguments args = malloc(sizeof (PAppData *) + sizeof (PWindowData *));
+	PThreadArguments args = malloc(sizeof (PAppData *) + sizeof (PWindowData *));
 	memcpy(args, &app_data, sizeof (PAppData **));
 	memcpy(&((char *)args)[sizeof (PAppData **)], &window_data, sizeof (PWindowData **));
-	window_data->event_manager = e_thread_create(p_x11_window_event_manage, args);
+	window_data->event_manager = p_thread_create(p_x11_window_event_manage, args);
 }
 
 /**
@@ -231,7 +280,7 @@ PHANTOM_API void p_x11_window_create(PAppData *app_data, const PWindowRequest wi
  *
  * sends a signal to close the window and the connection to the Xserver
  */
-PHANTOM_API void p_x11_window_close(PWindowData *window_data)
+void p_x11_window_close(PWindowData *window_data)
 {
 	window_data->status = P_WINDOW_STATUS_INTERNAL_CLOSE;
 	xcb_destroy_window(window_data->display_info->connection, window_data->display_info->window);
@@ -247,11 +296,11 @@ PHANTOM_API void p_x11_window_close(PWindowData *window_data)
 static void _x11_window_close(PAppData *app_data, PWindowData *window_data)
 {
 	// If window exists delete it.
-	e_mutex_lock(app_data->window_mutex);
+	p_mutex_lock(app_data->window_mutex);
 	int index = e_dynarr_find(app_data->window_data, &window_data);
 	if (index == -1)
 	{
-		e_log_message(E_LOG_ERROR, L"Phantom", L"Window does not exist...");
+		p_log_message(P_LOG_ERROR, L"Phantom", L"Window does not exist...");
 		exit(1);
 	}
 	PDisplayInfo *display_info = window_data->display_info;
@@ -264,10 +313,10 @@ static void _x11_window_close(PAppData *app_data, PWindowData *window_data)
 		free(window_data->event_calls);
 		free(window_data->name);
 		free(window_data);
-		e_thread_detach(e_thread_self());
+		p_thread_detach(p_thread_self());
 	}
 	e_dynarr_remove_unordered(app_data->window_data, index);
-	e_mutex_unlock(app_data->window_mutex);
+	p_mutex_unlock(app_data->window_mutex);
 }
 
 /**
@@ -276,7 +325,7 @@ static void _x11_window_close(PAppData *app_data, PWindowData *window_data)
  * This function runs in its own thread and manages window manager events
  * returns NULL
  */
-static EThreadResult p_x11_window_event_manage(EThreadArguments args)
+static PThreadResult p_x11_window_event_manage(PThreadArguments args)
 {
 	// unpack args
 	PAppData *app_data = ((PAppData **)args)[0];
@@ -290,11 +339,11 @@ static EThreadResult p_x11_window_event_manage(EThreadArguments args)
 		xcb_generic_event_t *event = xcb_wait_for_event(display_info->connection);
 		if (!event)
 		{
-			e_log_message(E_LOG_WARNING, L"Phantom", L"Event was null...");
-			e_mutex_lock(app_data->window_mutex);
+			p_log_message(P_LOG_WARNING, L"Phantom", L"Event was null...");
+			p_mutex_lock(app_data->window_mutex);
 			if (window_data->status == P_WINDOW_STATUS_ALIVE)
 				window_data->status = P_WINDOW_STATUS_CLOSE;
-			e_mutex_unlock(app_data->window_mutex);
+			p_mutex_unlock(app_data->window_mutex);
 			_x11_window_close(app_data, window_data);
 			break;
 		}
@@ -419,10 +468,10 @@ static EThreadResult p_x11_window_event_manage(EThreadArguments args)
 				if (event_calls->enable_destroy && event_calls->destroy != NULL)
 					event_calls->destroy();
 
-				e_mutex_lock(app_data->window_mutex);
+				p_mutex_lock(app_data->window_mutex);
 				if (window_data->status == P_WINDOW_STATUS_ALIVE)
 					window_data->status = P_WINDOW_STATUS_CLOSE;
-				e_mutex_unlock(app_data->window_mutex);
+				p_mutex_unlock(app_data->window_mutex);
 				_x11_window_close(app_data, window_data);
 
 				break;
@@ -439,7 +488,7 @@ static EThreadResult p_x11_window_event_manage(EThreadArguments args)
  *
  * sets the window in window_data to fullscreen
  */
-PHANTOM_API void p_x11_window_fullscreen(PWindowData *window_data)
+void p_x11_window_fullscreen(PWindowData *window_data)
 {
 	PDisplayInfo *display_info = window_data->display_info;
 
@@ -485,7 +534,7 @@ PHANTOM_API void p_x11_window_fullscreen(PWindowData *window_data)
  *
  * sets the window in window_data to (borderless/windowed) fullscreen
  */
-PHANTOM_API void p_x11_window_docked_fullscreen(PWindowData *window_data)
+void p_x11_window_docked_fullscreen(PWindowData *window_data)
 {
 	PDisplayInfo *display_info = window_data->display_info;
 	xcb_unmap_window(display_info->connection, display_info->window);
@@ -544,7 +593,7 @@ PHANTOM_API void p_x11_window_docked_fullscreen(PWindowData *window_data)
  *
  * sets the window in window_data to windowed mode and sets the dimensions
  */
-PHANTOM_API void p_x11_window_windowed(PWindowData *window_data, uint x, uint y, uint width, uint height)
+void p_x11_window_windowed(PWindowData *window_data, uint x, uint y, uint width, uint height)
 {
 	PDisplayInfo *display_info = window_data->display_info;
 

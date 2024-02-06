@@ -1,26 +1,28 @@
-# Phantom
-Graphics Library + GUI Framework
+# Platinum
+Platform Abstraction Library
 
-GUI capability
+## Features (TODO)
 
-Mode
-Xcb/Wayland/Win32
-	Fullscreen
-	Windowed
+### Windowing
+xcb
+wayland
+win32
+event control
 
+### Parallelism
+Threads
+Mutexes
+
+### IO
+File IO
+udev/evdev Raw input
+	- Keyboard (symbol and scancode)
+	- Controller
+	- Mouse
+
+### Graphics
 Vulkan
-	Widgets
+ncurses
 
-Input
-evdev/Windows Raw Input API
-	Keyboard (symbol and scancode)
-	Controller
-	Mouse
-
-Event control
-	XCB
-		LOTS of things
-	evdev
-		mouse movement + scroll + buttons, etc
-		keyboard buttons + scroll?, etc
-		game controller joystick + buttons + triggers, etc
+### Logging
+Color output

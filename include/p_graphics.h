@@ -1,8 +1,33 @@
-#ifndef _PHANTOM_GRAPHICS_VULKAN_H
-#define _PHANTOM_GRAPHICS_VULKAN_H
+#ifndef _PLATINUM_GRAPHICS_H
+#define _PLATINUM_GRAPHICS_H
 
 #include "enigma.h"
-#include "p_api.h"
+
+// External Forward Declarations
+typedef struct PWindowData PWindowData;
+
+// Internal Forward Declarations
+typedef struct PGraphicalAppRequest PGraphicalAppRequest;
+typedef struct PGraphicalDisplayRequest PGraphicalDisplayRequest;
+typedef struct PGraphicalDevice PGraphicalDevice;
+
+struct PGraphicalAppRequest {
+	bool headless;
+};
+
+struct PGraphicalDisplayRequest {
+	bool headless;
+	bool stereoscopic;
+};
+
+struct PGraphicalDevice {
+	char *name;
+	void *handle; // backend-specific handle (for vulkan its VkPhysicalDevice)
+};
+
+
+#ifdef PLATINUM_BACKEND_VULKAN
+
 #include <vulkan/vulkan.h>
 
 /**
@@ -96,6 +121,8 @@ typedef struct {
 	VkDebugUtilsMessengerEXT debug_messenger;
 } PVulkanAppData;
 
+#endif // PLATINUM_BACKEND_VULKAN
+
 
 // Vulkan specific implementation
 typedef VkSurfaceKHR PGraphicalDisplay;
@@ -118,20 +145,17 @@ typedef PVulkanDisplayData PGraphicalDisplayData;
 	p_vulkan_device_auto_pick(p_vulkan_display_data, p_vulkan_app_data, p_vulkan_display_request, p_graphical_display)
 
 
-PHANTOM_API
+#ifdef PLATINUM_BACKEND_VULKAN
+
 PGraphicalAppData *p_vulkan_init(PGraphicalAppRequest *graphical_app_request);
 
-PHANTOM_API
 void p_vulkan_deinit(PGraphicalAppData *vulkan_app_data);
 
-PHANTOM_API
 void p_vulkan_display_create(PWindowData *window_data, const PGraphicalAppData * const vulkan_app_data,
 		const PGraphicalDisplayRequest * const vulkan_display_request);
 
-PHANTOM_API
 void p_vulkan_display_destroy(PGraphicalDisplayData *vulkan_display_data);
 
-PHANTOM_API
 void p_vulkan_device_set(
 		PGraphicalDisplayData *graphical_display_data,
 		const PGraphicalDisplayRequest * const graphical_display_request,
@@ -139,11 +163,12 @@ void p_vulkan_device_set(
 		const PGraphicalDisplay display,
 		const PWindowData * const window_data);
 
-PHANTOM_API
 PGraphicalDevice p_vulkan_device_auto_pick(
 		PGraphicalDisplayData *graphical_display_data,
 		const PGraphicalAppData * const graphical_app_data,
 		const PGraphicalDisplayRequest * const graphical_display_request,
 		const PGraphicalDisplay display);
 
-#endif // _PHANTOM_GRAPHICS_VULKAN_H
+#endif // PLATINUM_BACKEND_VULKAN
+
+#endif // _PLATINUM_GRAPHICS_H
