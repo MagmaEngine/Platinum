@@ -4,7 +4,13 @@
 #include <string.h>
 #include <wchar.h>
 
-#include <xcb/xcb.h>
+#ifdef PLATINUM_GRAPHICS_VULKAN
+#include "p_graphics_vulkan.h"
+#endif // PLATINUM_GRAPHICS_VULKAN
+
+// Forward function declarations for internal functions
+void _window_close(PAppData *app_data, PWindowData *window_data);
+static PThreadResult _x11_window_event_manage(PThreadArguments args);
 
 // Internal Enums
 
@@ -50,10 +56,6 @@ struct PDisplayInfo {
 };
 
 // Internal Variables
-
-// Internal Functions
-
-static PThreadResult p_x11_window_event_manage(PThreadArguments args);
 
 // the pattern (free)(x) comes up a few times in this code. It is only used to bypass the memory debugger macros
 // which will error because the data is malloc'd in a library call instead of in-code
@@ -272,7 +274,7 @@ void p_x11_window_create(PAppData *app_data, const PWindowRequest window_request
 	PThreadArguments args = malloc(sizeof (PAppData *) + sizeof (PWindowData *));
 	memcpy(args, &app_data, sizeof (PAppData **));
 	memcpy(&((char *)args)[sizeof (PAppData **)], &window_data, sizeof (PWindowData **));
-	window_data->event_manager = p_thread_create(p_x11_window_event_manage, args);
+	window_data->event_manager = p_thread_create(_x11_window_event_manage, args);
 }
 
 /**
@@ -293,39 +295,21 @@ void p_x11_window_close(PWindowData *window_data)
  *
  * internal close function that actually closes the window and frees data
  */
-static void _x11_window_close(PAppData *app_data, PWindowData *window_data)
+void _x11_window_close(PWindowData *window_data)
 {
-	// If window exists delete it.
-	p_mutex_lock(app_data->window_mutex);
-	int index = e_dynarr_find(app_data->window_data, &window_data);
-	if (index == -1)
-	{
-		p_log_message(P_LOG_ERROR, L"Phantom", L"Window does not exist...");
-		exit(1);
-	}
 	PDisplayInfo *display_info = window_data->display_info;
-	p_graphics_display_destroy(window_data->graphical_display_data);
 	xcb_unmap_window(display_info->connection, display_info->window);
 	xcb_disconnect(display_info->connection);
-	free(window_data->display_info);
-	if (window_data->status == P_WINDOW_STATUS_CLOSE)
-	{
-		free(window_data->event_calls);
-		free(window_data->name);
-		free(window_data);
-		p_thread_detach(p_thread_self());
-	}
-	e_dynarr_remove_unordered(app_data->window_data, index);
-	p_mutex_unlock(app_data->window_mutex);
+	p_thread_discard(window_data->event_manager);
 }
 
 /**
- * p_x11_window_event_manage
+ * _x11_window_event_manage
  *
  * This function runs in its own thread and manages window manager events
  * returns NULL
  */
-static PThreadResult p_x11_window_event_manage(PThreadArguments args)
+PThreadResult _x11_window_event_manage(PThreadArguments args)
 {
 	// unpack args
 	PAppData *app_data = ((PAppData **)args)[0];
@@ -344,7 +328,7 @@ static PThreadResult p_x11_window_event_manage(PThreadArguments args)
 			if (window_data->status == P_WINDOW_STATUS_ALIVE)
 				window_data->status = P_WINDOW_STATUS_CLOSE;
 			p_mutex_unlock(app_data->window_mutex);
-			_x11_window_close(app_data, window_data);
+			_window_close(app_data, window_data);
 			break;
 		}
 		switch (event->response_type & ~0x80)
@@ -472,7 +456,7 @@ static PThreadResult p_x11_window_event_manage(PThreadArguments args)
 				if (window_data->status == P_WINDOW_STATUS_ALIVE)
 					window_data->status = P_WINDOW_STATUS_CLOSE;
 				p_mutex_unlock(app_data->window_mutex);
-				_x11_window_close(app_data, window_data);
+				_window_close(app_data, window_data);
 
 				break;
 			}
@@ -570,7 +554,7 @@ void p_x11_window_docked_fullscreen(PWindowData *window_data)
 			(char*)&ev_type);
 
 	uint x = 0, y = 0, width = display_info->screen->width_in_pixels, height = display_info->screen->height_in_pixels;
-	p_x11_window_set_dimensions(display_info, x, y, width, height);
+	p_window_set_dimensions(display_info, x, y, width, height);
 	xcb_configure_notify_event_t configure_event;
 	configure_event.response_type = XCB_CONFIGURE_NOTIFY;
 	configure_event.event = display_info->window;
@@ -626,7 +610,7 @@ void p_x11_window_windowed(PWindowData *window_data, uint x, uint y, uint width,
 	xcb_send_event(display_info->connection, 0, display_info->screen->root, XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT,
 			(char*)&ev_type);
 
-	p_x11_window_set_dimensions(display_info, x, y, width, height);
+	p_window_set_dimensions(display_info, x, y, width, height);
 	xcb_configure_notify_event_t configure_event;
 	configure_event.response_type = XCB_CONFIGURE_NOTIFY;
 	configure_event.event = display_info->window;
@@ -644,4 +628,24 @@ void p_x11_window_windowed(PWindowData *window_data, uint x, uint y, uint width,
 	xcb_flush(display_info->connection);
 	xcb_map_window(display_info->connection, display_info->window);
 	xcb_flush(display_info->connection);
+}
+
+/**
+ * p_x11_window_set_graphical_display
+ *
+ * adds a graphical surface to the window display
+ */
+void p_x11_window_set_graphical_display(PWindowData *window_data, PGraphicalAppData graphical_app_data,
+		PGraphicalDisplayData graphical_display_data)
+{
+	VkXcbSurfaceCreateInfoKHR vk_surface_create_info = {0};
+	vk_surface_create_info.sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR;
+	vk_surface_create_info.connection = window_data->display_info->connection;
+	vk_surface_create_info.window = window_data->display_info->window;
+	if (vkCreateXcbSurfaceKHR(graphical_app_data->instance, &vk_surface_create_info, NULL, &graphical_display_data->surface)
+			!= VK_SUCCESS)
+	{
+		p_log_message(P_LOG_ERROR, L"Vulkan General", L"Failed to create XCB surface!");
+		exit(1);
+	}
 }

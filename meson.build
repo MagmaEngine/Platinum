@@ -1,4 +1,12 @@
-platinum_srcs = []
+platinum_srcs = [
+  files('src/p_app.c'),
+  files('src/p_window.c'),
+  files('src/p_graphics.c'),
+  files('src/util/p_debug_mem.c'),
+  files('src/util/p_file.c'),
+  files('src/util/p_log.c'),
+  files('src/util/p_thread.c'),
+  ]
 
 platinum_deps = [
   dep_libenigma,
@@ -8,34 +16,37 @@ platinum_c_args = [
   '-D_PLATINUM_INTERNAL',
   ]
 
-## Phantom build setup
-# Vulkan
+# Platinum Graphics Settings
 if graphics == 'vulkan'
+  platinum_c_args += [
+    '-DPLATINUM_GRAPHICS_VULKAN',
+  ]
   platinum_srcs += [
     files('src/p_graphics_vulkan.c'),
   ]
   platinum_deps += [
-    dep_vulkan,
+    dependency('vulkan', required : true)
   ]
 endif
+
+
+## Phantom Window Settings
 # Windows
 if host_machine.system() == 'windows'
   platinum_srcs += [
     files('src/p_window_win32.c'),
     files('src/p_app_windows.c'),
-    #files('src/input/p_windows_events.c'),
     ]
   platinum_c_args += [
     '-DPLATINUM_PLATFORM_WINDOWS',
+    '-DPLATINUM_DISPLAY_WIN32',
     ]
 # Linux
 elif host_machine.system() == 'linux'
   platinum_srcs += [
     files('src/p_app_linux.c'),
-    files('src/p_events_linux.c'),
     ]
   platinum_deps += [
-    dep_display,
     dependency('libevdev', required : true),
     dependency('libudev', required : true),
     ]
@@ -44,15 +55,33 @@ elif host_machine.system() == 'linux'
     ]
 # X11
   if display == 'x11'
+    platinum_deps += [
+      dependency('xcb', required : true)
+      ]
+    platinum_c_args += [
+      '-DPLATINUM_DISPLAY_X11',
+    ]
     platinum_srcs += [
       files('src/p_window_x11.c'),
       ]
 # Wayland
   elif display == 'wayland'
+    platinum_deps += [
+      dependency('wayland-client', required : true),
+    ]
+    platinum_c_args += [
+      '-DPLATINUM_DISPLAY_WAYLAND',
+    ]
     platinum_srcs += [
       files('src/p_window_wayland.c'),
       ]
   elif display == 'ncurses'
+    platinum_deps += [
+      dependency('ncurses', required : true)
+    ]
+    platinum_c_args += [
+      '-DPLATINUM_DISPLAY_NCURSES',
+    ]
     message('TODO: implement me')
   else
     error('There must be at least one graphical back-end installed.')

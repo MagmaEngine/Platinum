@@ -1,13 +1,12 @@
 #include <stdlib.h>
 #include <string.h>
-#include "platium.h"
-
-typedef unsigned int uint;
+#include "platinum.h"
 
 extern void p_debug_mem_print(uint min_allocs);
 
 #define P_MEM_OVER_ALLOC 32
 #define P_MEM_MAGIC_NUMBER 132
+
 typedef struct{
 	uint size;
 	void *buf;
@@ -27,8 +26,8 @@ typedef struct{
 STMemAllocLine p_alloc_lines[1024];
 uint p_alloc_line_count = 0;
 void *p_alloc_mutex = NULL;
-void (*p_alloc_mutex_lock)(PMutex *mutex) = NULL;
-void (*p_alloc_mutex_unlock)(PMutex *mutex) = NULL;
+void (*p_alloc_mutex_lock)(PMutex mutex) = NULL;
+void (*p_alloc_mutex_unlock)(PMutex mutex) = NULL;
 
 
 void p_debug_memory_init(PMutex *mutex)
@@ -37,6 +36,8 @@ void p_debug_memory_init(PMutex *mutex)
 	p_alloc_mutex = mutex;
 	p_alloc_mutex_lock = p_mutex_lock;
 	p_alloc_mutex_unlock = p_mutex_unlock;
+#else
+	E_UNUSED(mutex);
 #endif
 }
 
@@ -123,7 +124,7 @@ void p_debug_mem_add(void *pointer, uint size, char *file, uint line)
 	}
 }
 
-void *e_debug_mem_malloc(size_t size, char *file, uint line)
+void *p_debug_mem_malloc(size_t size, char *file, uint line)
 {
 	void *pointer;
 	if (p_alloc_mutex != NULL)
@@ -199,7 +200,7 @@ void p_debug_mem_free(void *buf)
 {
 	if (p_alloc_mutex != NULL)
 		p_alloc_mutex_lock(p_alloc_mutex);
-	if (!e_debug_mem_remove(buf))
+	if (!p_debug_mem_remove(buf))
 	{
 		uint *X = NULL;
 		X[0] = 0;
@@ -210,7 +211,7 @@ void p_debug_mem_free(void *buf)
 }
 
 
-void *e_debug_mem_realloc(void *pointer, size_t size, char *file, uint line)
+void *p_debug_mem_realloc(void *pointer, size_t size, char *file, uint line)
 {
 	uint i, j, k, move;
 	void *pointer2;
@@ -281,7 +282,7 @@ void *e_debug_mem_realloc(void *pointer, size_t size, char *file, uint line)
 
 void p_debug_mem_print(uint min_allocs)
 {
-#ifdef ENIGMA_DEBUG_MEMORY
+#ifdef PLATINUM_DEBUG_MEMORY
 	uint i;
 	if (p_alloc_mutex != NULL)
 		p_alloc_mutex_lock(p_alloc_mutex);
@@ -299,12 +300,14 @@ void p_debug_mem_print(uint min_allocs)
 	p_log_message(P_LOG_DEBUG, L"Memory",L"----------------------------------------------");
 	if (p_alloc_mutex != NULL)
 		p_alloc_mutex_unlock(p_alloc_mutex);
+#else
+	E_UNUSED(min_allocs);
 #endif
 }
 
 uint32_t p_debug_mem_consumption(void)
 {
-#ifdef ENIGMA_DEBUG_MEMORY
+#ifdef PLATINUM_DEBUG_MEMORY
 	uint i, sum = 0;
 
 	if (p_alloc_mutex != NULL)
@@ -314,12 +317,14 @@ uint32_t p_debug_mem_consumption(void)
 	if (p_alloc_mutex != NULL)
 		p_alloc_mutex_unlock(p_alloc_mutex);
 	return sum;
+#else
+	return 0;
 #endif
 }
 
 void p_debug_mem_reset(void)
 {
-#ifdef ENIGMA_DEBUG_MEMORY
+#ifdef PLATINUM_DEBUG_MEMORY
 	uint i;
 	if (p_alloc_mutex != NULL)
 		p_alloc_mutex_lock(p_alloc_mutex);

@@ -1,11 +1,6 @@
 #include "platinum.h"
 #include <string.h>
-
-#ifdef PLATINUM_DISPLAY_X11
-#include <vulkan/vulkan_xcb.h>
-#elif defined PLATINUM_DISPLAY_WIN32
-#include <vulkan/vulkan_win32.h>
-#endif // PLATINUM_DISPLAY_XXXXXX
+#include "p_graphics_vulkan.h"
 
 /**
  * _vulkan_app_request_convert
@@ -26,11 +21,10 @@ PVulkanAppRequest *_vulkan_app_request_convert(const PGraphicalAppRequest * cons
 #ifdef PLATINUM_DISPLAY_X11
 		e_dynarr_add(vulkan_app_request->required_extensions, E_VOID_PTR_FROM_VALUE(char *,
 					VK_KHR_XCB_SURFACE_EXTENSION_NAME));
-#endif // PLATINUM_DISPLAY_X11
-#ifdef PLATINUM_DISPLAY_WIN32
+#elif defined PLATINUM_DISPLAY_WIN32
 		e_dynarr_add(vulkan_app_data->required_extensions, E_VOID_PTR_FROM_VALUE(char *,
 					VK_KHR_WIN32_SURFACE_EXTENSION_NAME));
-#endif // PLATINUM_DISPLAY_WIN32
+#endif // PLATINUM_DISPLAY
 	}
 #ifdef PLATINUM_DEBUG_GRAPHICS
 	e_dynarr_add(vulkan_app_request->required_extensions, E_VOID_PTR_FROM_VALUE(char *,
@@ -95,7 +89,7 @@ PVulkanDisplayRequest *_vulkan_display_request_convert(const PGraphicalDisplayRe
  *
  * deinits data created as a part of request init
  */
-PLATINUM_API void _vulkan_display_request_destroy(PVulkanDisplayRequest *vulkan_display_request)
+void _vulkan_display_request_destroy(PVulkanDisplayRequest *vulkan_display_request)
 {
 	e_dynarr_deinit(vulkan_display_request->required_extensions);
 	e_dynarr_deinit(vulkan_display_request->required_layers);
@@ -161,13 +155,13 @@ void p_vulkan_list_available_extensions(void)
 	// Check availible extensions
 	uint32_t vulkan_available_extension_count;
 	vkEnumerateInstanceExtensionProperties(NULL, &vulkan_available_extension_count, NULL);
-	e_log_message(E_LOG_INFO, L"Vulkan General", L"Number of extensions: %i", vulkan_available_extension_count);
+	p_log_message(P_LOG_INFO, L"Vulkan General", L"Number of extensions: %i", vulkan_available_extension_count);
 
 	VkExtensionProperties *vulkan_available_extensions = malloc(vulkan_available_extension_count *
 			sizeof(VkExtensionProperties));
 	vkEnumerateInstanceExtensionProperties(NULL, &vulkan_available_extension_count, vulkan_available_extensions);
 	for (uint32_t i = 0; i < vulkan_available_extension_count; i++)
-		e_log_message(E_LOG_DEBUG, L"Vulkan General", L"Supported extension: %s",
+		p_log_message(P_LOG_DEBUG, L"Vulkan General", L"Supported extension: %s",
 				vulkan_available_extensions[i].extensionName);
 	free(vulkan_available_extensions);
 }
@@ -181,10 +175,10 @@ void p_vulkan_list_available_devices(const VkInstance instance)
 {
 	uint32_t vulkan_available_device_count = 0;
 	vkEnumeratePhysicalDevices(instance, &vulkan_available_device_count, NULL);
-	e_log_message(E_LOG_INFO, L"Vulkan General", L"Number of devices: %i", vulkan_available_device_count);
+	p_log_message(P_LOG_INFO, L"Vulkan General", L"Number of devices: %i", vulkan_available_device_count);
 	if (vulkan_available_device_count == 0)
 	{
-		e_log_message(E_LOG_ERROR, L"Vulkan General", L"Failed to find GPUs with Vulkan support!");
+		p_log_message(P_LOG_ERROR, L"Vulkan General", L"Failed to find GPUs with Vulkan support!");
 		exit(1);
 	}
 }
@@ -198,14 +192,14 @@ void p_vulkan_list_available_layers(void)
 {
 	uint32_t vulkan_available_layer_count;
 	vkEnumerateInstanceLayerProperties(&vulkan_available_layer_count, NULL);
-	e_log_message(E_LOG_INFO, L"Vulkan General", L"Number of layers: %i", vulkan_available_layer_count);
+	p_log_message(P_LOG_INFO, L"Vulkan General", L"Number of layers: %i", vulkan_available_layer_count);
 
 	VkLayerProperties *vulkan_available_layers = malloc(vulkan_available_layer_count *
 			sizeof(*vulkan_available_layers));
 	vkEnumerateInstanceLayerProperties(&vulkan_available_layer_count, vulkan_available_layers);
 
 	for (uint32_t i = 0; i < vulkan_available_layer_count; i++) {
-		e_log_message(E_LOG_DEBUG, L"Vulkan General", L"Supported layers: %s", vulkan_available_layers[i].layerName);
+		p_log_message(P_LOG_DEBUG, L"Vulkan General", L"Supported layers: %s", vulkan_available_layers[i].layerName);
 	}
 	free(vulkan_available_layers);
 }
@@ -241,27 +235,27 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL _vulkan_debug_callback(
 			break;
 	}
 
-	enum ELogLevel log_level;
+	enum PLogLevel log_level;
 	switch (messageSeverity)
 	{
 		case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
-			log_level = E_LOG_DEBUG;
+			log_level = P_LOG_DEBUG;
 			break;
 		case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:
-			log_level = E_LOG_INFO;
+			log_level = P_LOG_INFO;
 			break;
 		case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
-			log_level = E_LOG_WARNING;
+			log_level = P_LOG_WARNING;
 			break;
 		case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
-			log_level = E_LOG_ERROR;
+			log_level = P_LOG_ERROR;
 			break;
 		// this one should never happen
 		case VK_DEBUG_UTILS_MESSAGE_SEVERITY_FLAG_BITS_MAX_ENUM_EXT:
-			log_level = E_LOG_MAX;
+			log_level = P_LOG_MAX;
 			break;
 	}
-	e_log_message(log_level, log_channel, L"%s", pCallbackData->pMessage);
+	p_log_message(log_level, log_channel, L"%s", pCallbackData->pMessage);
 	return VK_FALSE;
 }
 
@@ -424,9 +418,9 @@ static VkPhysicalDeviceFeatures _vulkan_get_required_features(const PVulkanDispl
 	if (vulkan_display_request->required_features.inheritedQueries && !device_features.inheritedQueries) e_dynarr_add(missing_features, L"inheritedQueries");
 	if (missing_features->num_items > 0)
 	{
-		e_log_message(E_LOG_ERROR, L"Phantom", L"Vulkan required features not supported");
+		p_log_message(P_LOG_ERROR, L"Phantom", L"Vulkan required features not supported");
 		for (uint i = 0; i < missing_features->num_items; i++)
-			e_log_message(E_LOG_ERROR, L"Phantom", L"\t%ls", E_DYNARR_GET(missing_features, wchar_t *, i));
+			p_log_message(P_LOG_ERROR, L"Phantom", L"\t%ls", E_DYNARR_GET(missing_features, wchar_t *, i));
 		exit(1);
 	}
 	e_dynarr_deinit(missing_features);
@@ -449,7 +443,7 @@ static VkQueueFlags _vulkan_get_required_queue_flags(const PVulkanDisplayRequest
 				device, surface, 0, true);
 		if (!queue_family_info.exists)
 		{
-			e_log_message(E_LOG_ERROR, L"Vulkan General", L"Presentation not supported.");
+			p_log_message(P_LOG_ERROR, L"Vulkan General", L"Presentation not supported.");
 			exit(1);
 		}
 	}
@@ -461,7 +455,7 @@ static VkQueueFlags _vulkan_get_required_queue_flags(const PVulkanDisplayRequest
 		PVulkanQueueFamilyInfo queue_family_info = _vulkan_find_viable_queue_family_info(device, surface, flag, false);
 		if ((flag & vulkan_display_request->required_queue_flags) && !queue_family_info.exists)
 		{
-			e_log_message(E_LOG_ERROR, L"Vulkan General", L"Required Vulkan queue type \"%i\" does not exist!", flag);
+			p_log_message(P_LOG_ERROR, L"Vulkan General", L"Required Vulkan queue type \"%i\" does not exist!", flag);
 			exit(1);
 		}
 	}
@@ -485,7 +479,7 @@ static EDynarr *_vulkan_get_required_extensions(const EDynarr * const required_e
 			e_dynarr_add(extensions, E_VOID_PTR_FROM_VALUE(char *, extension));
 		else
 		{
-			e_log_message(E_LOG_ERROR, L"Vulkan General", L"Required extension \"%s\" does not exist!", extension);
+			p_log_message(P_LOG_ERROR, L"Vulkan General", L"Required extension \"%s\" does not exist!", extension);
 			exit(1);
 		}
 	}
@@ -508,7 +502,7 @@ EDynarr *_vulkan_get_required_layers(const EDynarr * const required_layers)
 			e_dynarr_add(enabled_layers, E_VOID_PTR_FROM_VALUE(char *,layer));
 		else
 		{
-			e_log_message(E_LOG_ERROR, L"Vulkan General", L"Required layer \"%s\" does not exist!", layer);
+			p_log_message(P_LOG_ERROR, L"Vulkan General", L"Required layer \"%s\" does not exist!", layer);
 			exit(1);
 		}
 	}
@@ -521,7 +515,7 @@ EDynarr *_vulkan_get_required_layers(const EDynarr * const required_layers)
  * helper function that creates a swapchain for the given window
  */
 static void _vulkan_swapchain_create(
-		PVulkanDisplayData * const vulkan_display_data,
+		PGraphicalDisplayData const vulkan_display_data,
 		const uint32_t framebuffer_width,
 		const uint32_t framebuffer_height,
 		const PGraphicalDisplayRequest * const graphical_display_request,
@@ -585,7 +579,7 @@ static void _vulkan_swapchain_create(
 	if (vkCreateSwapchainKHR(vulkan_display_data->logical_device, &swapchain_create_info, NULL,
 			&vulkan_display_data->swapchain) != VK_SUCCESS)
 	{
-		e_log_message(E_LOG_ERROR, L"Vulkan General", L"Failed to create swapchain!");
+		p_log_message(P_LOG_ERROR, L"Vulkan General", L"Failed to create swapchain!");
 		exit(1);
 	}
 	vkGetSwapchainImagesKHR(vulkan_display_data->logical_device, vulkan_display_data->swapchain, &image_count, NULL);
@@ -617,7 +611,7 @@ static void _vulkan_swapchain_create(
 		if (vkCreateImageView(vulkan_display_data->logical_device, &image_view_create_info, NULL,
 				&E_DYNARR_GET(vulkan_display_data->swapchain_image_views, VkImageView, i)) != VK_SUCCESS)
 		{
-			e_log_message(E_LOG_ERROR, L"Vulkan General", L"Failed to create image view!");
+			p_log_message(P_LOG_ERROR, L"Vulkan General", L"Failed to create image view!");
 			exit(1);
 		}
 	}
@@ -690,27 +684,26 @@ static PVulkanSwapchainSupport _vulkan_swapchain_auto_pick(const VkPhysicalDevic
 }
 
 /**
- * p_vulkan_device_set
+ * p_graphics_vulkan_device_set
  *
  * sets the physical device to use in vulkan_display_data from physical_device
  * also creates a logical device with vulkan_app_request and sets it to vulkan_display_data
  */
-PLATINUM_API
-void p_vulkan_device_set(
-		PGraphicalDisplayData *graphical_display_data,
+void p_graphics_vulkan_device_set(
+		PGraphicalDisplayData graphical_display_data,
 		const PGraphicalDisplayRequest * const graphical_display_request,
 		const PGraphicalDevice physical_device,
-		const PGraphicalDisplay display,
+		const PGraphicalDisplayData display,
 		const PWindowData * const window_data)
 
 {
 	// convert
 	PVulkanDisplayRequest *vulkan_display_request = _vulkan_display_request_convert(graphical_display_request);
-	PVulkanDisplayData *vulkan_display_data = graphical_display_data;
+	PGraphicalDisplayData vulkan_display_data = graphical_display_data;
 
 	if (e_dynarr_find(vulkan_display_data->compatible_devices, &physical_device.handle) == -1)
 	{
-		e_log_message(E_LOG_ERROR, L"Vulkan General", L"Selected device is not compatible");
+		p_log_message(P_LOG_ERROR, L"Vulkan General", L"Selected device is not compatible");
 		exit(1);
 	}
 
@@ -718,31 +711,31 @@ void p_vulkan_device_set(
 	vulkan_display_data->current_physical_device = physical_device.handle;
 
 	// Set queue family indices
-	VkQueueFlags enabled_queue_flags = _vulkan_get_required_queue_flags(vulkan_display_request, physical_device.handle, display);
+	VkQueueFlags enabled_queue_flags = _vulkan_get_required_queue_flags(vulkan_display_request, physical_device.handle, display->surface);
 	if (enabled_queue_flags & VK_QUEUE_GRAPHICS_BIT)
 		vulkan_display_data->queue_family_infos[P_VULKAN_QUEUE_TYPE_GRAPHICS] =
-			_vulkan_find_viable_queue_family_info(physical_device.handle, display, VK_QUEUE_GRAPHICS_BIT, false);
+			_vulkan_find_viable_queue_family_info(physical_device.handle, display->surface, VK_QUEUE_GRAPHICS_BIT, false);
 	if (vulkan_display_request->require_present)
 		vulkan_display_data->queue_family_infos[P_VULKAN_QUEUE_TYPE_PRESENT] =
-			_vulkan_find_viable_queue_family_info(physical_device.handle, display, VK_QUEUE_GRAPHICS_BIT, true);
+			_vulkan_find_viable_queue_family_info(physical_device.handle, display->surface, VK_QUEUE_GRAPHICS_BIT, true);
 	if (enabled_queue_flags & VK_QUEUE_COMPUTE_BIT)
 		vulkan_display_data->queue_family_infos[P_VULKAN_QUEUE_TYPE_COMPUTE] =
-			_vulkan_find_viable_queue_family_info(physical_device.handle, display, VK_QUEUE_COMPUTE_BIT, false);
+			_vulkan_find_viable_queue_family_info(physical_device.handle, display->surface, VK_QUEUE_COMPUTE_BIT, false);
 	if (enabled_queue_flags & VK_QUEUE_TRANSFER_BIT)
 		vulkan_display_data->queue_family_infos[P_VULKAN_QUEUE_TYPE_TRANSFER] =
-			_vulkan_find_viable_queue_family_info(physical_device.handle, display, VK_QUEUE_TRANSFER_BIT, false);
+			_vulkan_find_viable_queue_family_info(physical_device.handle, display->surface, VK_QUEUE_TRANSFER_BIT, false);
 	if (enabled_queue_flags & VK_QUEUE_SPARSE_BINDING_BIT)
 		vulkan_display_data->queue_family_infos[P_VULKAN_QUEUE_TYPE_SPARSE] =
-			_vulkan_find_viable_queue_family_info(physical_device.handle, display, VK_QUEUE_SPARSE_BINDING_BIT, false);
+			_vulkan_find_viable_queue_family_info(physical_device.handle, display->surface, VK_QUEUE_SPARSE_BINDING_BIT, false);
 	if (enabled_queue_flags & VK_QUEUE_PROTECTED_BIT)
 		vulkan_display_data->queue_family_infos[P_VULKAN_QUEUE_TYPE_PROTECTED] =
-			_vulkan_find_viable_queue_family_info(physical_device.handle, display, VK_QUEUE_PROTECTED_BIT, false);
+			_vulkan_find_viable_queue_family_info(physical_device.handle, display->surface, VK_QUEUE_PROTECTED_BIT, false);
 	if (enabled_queue_flags & VK_QUEUE_VIDEO_DECODE_BIT_KHR)
 		vulkan_display_data->queue_family_infos[P_VULKAN_QUEUE_TYPE_VIDEO_DECODE] =
-			_vulkan_find_viable_queue_family_info(physical_device.handle, display, VK_QUEUE_VIDEO_DECODE_BIT_KHR, false);
+			_vulkan_find_viable_queue_family_info(physical_device.handle, display->surface, VK_QUEUE_VIDEO_DECODE_BIT_KHR, false);
 	if (enabled_queue_flags & VK_QUEUE_OPTICAL_FLOW_BIT_NV)
 		vulkan_display_data->queue_family_infos[P_VULKAN_QUEUE_TYPE_OPTICAL_FLOW] =
-			_vulkan_find_viable_queue_family_info(physical_device.handle, display, VK_QUEUE_OPTICAL_FLOW_BIT_NV, false);
+			_vulkan_find_viable_queue_family_info(physical_device.handle, display->surface, VK_QUEUE_OPTICAL_FLOW_BIT_NV, false);
 
 	EDynarr *queue_family_infos = e_dynarr_init(sizeof (PVulkanQueueFamilyInfo), 1);
 	for (uint i = 0; i < P_VULKAN_QUEUE_TYPE_MAX; i++)
@@ -813,7 +806,7 @@ void p_vulkan_device_set(
 	if (vkCreateDevice(vulkan_display_data->current_physical_device, &device_create_info, NULL,
 				&vulkan_display_data->logical_device) != VK_SUCCESS)
 	{
-		e_log_message(E_LOG_ERROR, L"Vulkan General", L"Failed to create logical device!");
+		p_log_message(P_LOG_ERROR, L"Vulkan General", L"Failed to create logical device!");
 		exit(1);
 	}
 	e_dynarr_deinit(enabled_extensions);
@@ -832,7 +825,7 @@ void p_vulkan_device_set(
 	}
 
 	// Set swapchain data
-	PVulkanSwapchainSupport swapchain_support = _vulkan_swapchain_auto_pick(physical_device.handle, display);
+	PVulkanSwapchainSupport swapchain_support = _vulkan_swapchain_auto_pick(physical_device.handle, display->surface);
 	_vulkan_swapchain_create(vulkan_display_data, window_data->x, window_data->y, graphical_display_request,
 			swapchain_support);
 	free(swapchain_support.format);
@@ -840,21 +833,19 @@ void p_vulkan_device_set(
 }
 
 /**
- * p_vulkan_device_auto_pick
+ * p_graphics_vulkan_device_auto_pick
  *
  * initializes compatible_devices in vulkan_display_data
  * picks the physical device for use with vulkan and returns it
  * returns VK_NULL_HANDLE if no suitable device is found
  */
-PLATINUM_API
-PGraphicalDevice p_vulkan_device_auto_pick(
-		PGraphicalDisplayData *graphical_display_data,
-		const PGraphicalAppData * const graphical_app_data,
-		const PGraphicalDisplayRequest * const graphical_display_request,
-		const PGraphicalDisplay display)
+PGraphicalDevice p_graphics_vulkan_device_auto_pick(
+		PGraphicalDisplayData graphical_display_data,
+		const PGraphicalAppData graphical_app_data,
+		const PGraphicalDisplayRequest * const graphical_display_request)
 {
-	PVulkanDisplayData *vulkan_display_data = graphical_display_data;
-	const PVulkanAppData * const vulkan_app_data = graphical_app_data;
+	PGraphicalDisplayData vulkan_display_data = graphical_display_data;
+	const PGraphicalAppData vulkan_app_data = graphical_app_data;
 	vulkan_display_data->current_physical_device = VK_NULL_HANDLE;
 
 	uint32_t vulkan_available_device_count = 0;
@@ -883,7 +874,7 @@ PGraphicalDevice p_vulkan_device_auto_pick(
 		score += device_properties.limits.maxImageDimension2D;
 
 		// Check for swapchain support
-		PVulkanSwapchainSupport swapchain = _vulkan_swapchain_auto_pick(device, display);
+		PVulkanSwapchainSupport swapchain = _vulkan_swapchain_auto_pick(device, vulkan_display_data->surface);
 		if (swapchain.format == NULL || swapchain.present_mode == NULL)
 		{
 			score = -1;
@@ -894,7 +885,7 @@ PGraphicalDevice p_vulkan_device_auto_pick(
 
 		// get required queue flags to make sure they exist
 		PVulkanDisplayRequest *vulkan_display_request = _vulkan_display_request_convert(graphical_display_request);
-		_vulkan_get_required_queue_flags(vulkan_display_request, device, display);
+		_vulkan_get_required_queue_flags(vulkan_display_request, device, vulkan_display_data->surface);
 
 		// get required features to make sure they exist
 		_vulkan_get_required_features(vulkan_display_request, device);
@@ -938,14 +929,14 @@ end_device_score_eval:
 }
 
 /**
- * p_vulkan_init
+ * p_graphics_vulkan_init
  *
  * Initializes vulkan and sets the result in app_instance
  */
-PLATINUM_API PGraphicalAppData *p_vulkan_init(PGraphicalAppRequest *graphical_app_request)
+PGraphicalAppData p_graphics_vulkan_init(PGraphicalAppRequest *graphical_app_request)
 {
 	PVulkanAppRequest *vulkan_app_request = _vulkan_app_request_convert(graphical_app_request);
-	PGraphicalAppData *vulkan_app_data = malloc(sizeof *vulkan_app_data);
+	PGraphicalAppData vulkan_app_data = malloc(sizeof *vulkan_app_data);
 
 #ifdef PLATINUM_DEBUG_GRAPHICS
 	p_vulkan_list_available_extensions();
@@ -986,7 +977,7 @@ PLATINUM_API PGraphicalAppData *p_vulkan_init(PGraphicalAppRequest *graphical_ap
 
 	if (vkCreateInstance(&vk_instance_create_info, NULL, &vulkan_app_data->instance) != VK_SUCCESS)
 	{
-		e_log_message(E_LOG_ERROR, L"Phantom", L"Error initializing Vulkan instance.");
+		p_log_message(P_LOG_ERROR, L"Phantom", L"Error initializing Vulkan instance.");
 		exit(1);
 	}
 	e_dynarr_deinit(enabled_extensions);
@@ -995,7 +986,7 @@ PLATINUM_API PGraphicalAppData *p_vulkan_init(PGraphicalAppRequest *graphical_ap
 #ifdef PLATINUM_DEBUG_GRAPHICS
 	if (_vulkan_create_debug_utils_messenger(vulkan_app_data->instance, &vk_debug_utils_messenger_create_info, NULL,
 				&vulkan_app_data->debug_messenger) != VK_SUCCESS) {
-		e_log_message(E_LOG_ERROR, L"Vulkan General", L"Failed to set up debug messenger!");
+		p_log_message(P_LOG_ERROR, L"Vulkan General", L"Failed to set up debug messenger!");
 		exit(1);
 	}
 #endif // PLATINUM_DEBUG_GRAPHICS
@@ -1003,11 +994,11 @@ PLATINUM_API PGraphicalAppData *p_vulkan_init(PGraphicalAppRequest *graphical_ap
 }
 
 /**
- * p_vulkan_deinit
+ * p_graphics_vulkan_deinit
  *
  * Deinitializes vulkan
  */
-PLATINUM_API void p_vulkan_deinit(PVulkanAppData *vulkan_app_data)
+void p_graphics_vulkan_deinit(PGraphicalAppData vulkan_app_data)
 {
 #ifdef PLATINUM_DEBUG_GRAPHICS
 	_vulkan_destroy_debug_utils_messenger(vulkan_app_data->instance, vulkan_app_data->debug_messenger, NULL);
@@ -1021,7 +1012,7 @@ PLATINUM_API void p_vulkan_deinit(PVulkanAppData *vulkan_app_data)
  *
  * TODO: move me into renderer
  */
-VkShaderModule _create_shader_module(PVulkanDisplayData *vulkan_display_data, const char *shader_data,
+VkShaderModule _create_shader_module(PGraphicalDisplayData vulkan_display_data, const char *shader_data,
 		uint shader_data_size)
 {
 	VkShaderModule shader_module;
@@ -1032,7 +1023,7 @@ VkShaderModule _create_shader_module(PVulkanDisplayData *vulkan_display_data, co
 	if (vkCreateShaderModule(vulkan_display_data->logical_device, &create_info, NULL, &shader_module)
 			!= VK_SUCCESS)
 	{
-		e_log_message(E_LOG_ERROR, L"Vulkan General", L"Failed to create shader module!");
+		p_log_message(P_LOG_ERROR, L"Vulkan General", L"Failed to create shader module!");
 		exit(1);
 	}
 	return shader_module;
@@ -1040,66 +1031,41 @@ VkShaderModule _create_shader_module(PVulkanDisplayData *vulkan_display_data, co
 
 
 /**
- * p_vulkan_display_create
+ * p_graphics_vulkan_display_create
  *
  * Creates a vulkan surface based on the platform
  * and assigns it to window_data
  */
-PLATINUM_API
-void p_vulkan_display_create(PWindowData *window_data, const PGraphicalAppData * const vulkan_app_data,
+void p_graphics_vulkan_display_create(PWindowData *window_data, const PGraphicalAppData vulkan_app_data,
 		const PGraphicalDisplayRequest * const vulkan_display_request)
 {
-	PVulkanDisplayData *vulkan_display_data = calloc(1, sizeof *vulkan_display_data);
+	PGraphicalDisplayData vulkan_display_data = calloc(1, sizeof *vulkan_display_data);
 	vulkan_display_data->instance = vulkan_app_data->instance;
 
-#ifdef PLATINUM_DISPLAY_X11
-	VkXcbSurfaceCreateInfoKHR vk_surface_create_info = {0};
-	vk_surface_create_info.sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR;
-	vk_surface_create_info.connection = window_data->display_info->connection;
-	vk_surface_create_info.window = window_data->display_info->window;
-	if (vkCreateXcbSurfaceKHR(vulkan_app_data->instance, &vk_surface_create_info, NULL, &vulkan_display_data->surface)
-			!= VK_SUCCESS)
-	{
-		e_log_message(E_LOG_ERROR, L"Vulkan General", L"Failed to create XCB surface!");
-		exit(1);
-	}
-#elif defined PLATINUM_DISPLAY_WAYLAND
-	// TODO: implement me
-#elif defined PLATINUM_DISPLAY_WIN32
-	VkWin32SurfaceCreateInfoKHR vk_surface_create_info;
-	vk_surface_create_info.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
-	vk_surface_create_info.hwnd = window_data->display_info->hwnd;
-	vk_surface_create_info.hinstance = window_data->display_info->hInstance;
-	if (vkCreateWin32SurfaceKHR(vulkan_app_data->instance, &vk_surface_create_info, NULL, vulkan_display_data->surface)
-			!= VK_SUCCESS)
-	{
-		e_log_message(E_LOG_ERROR, L"Vulkan General", L"Failed to create Win32 surface!");
-		exit(1);
-	}
-#endif
+	p_window_set_graphical_display(window_data, vulkan_app_data, vulkan_display_data);
 
-	PGraphicalDevice physical_device = p_vulkan_device_auto_pick(vulkan_display_data, vulkan_app_data,
-			vulkan_display_request, vulkan_display_data->surface);
+	PGraphicalDevice physical_device = p_graphics_vulkan_device_auto_pick(vulkan_display_data, vulkan_app_data,
+			vulkan_display_request);
 	if (physical_device.handle == VK_NULL_HANDLE)
 	{
-		e_log_message(E_LOG_ERROR, L"Vulkan General", L"Failed to find a suitable GPU!");
+		p_log_message(P_LOG_ERROR, L"Vulkan General", L"Failed to find a suitable GPU!");
 		exit(1);
 	}
-	p_vulkan_device_set(vulkan_display_data, vulkan_display_request,physical_device, vulkan_display_data->surface,
+	p_graphics_vulkan_device_set(vulkan_display_data, vulkan_display_request,physical_device, vulkan_display_data,
 			window_data);
 
-	window_data->graphical_display_data = (PGraphicalDisplayData *)vulkan_display_data;
+	window_data->graphical_display_data = vulkan_display_data;
 
 	// TODO: refactor this to get shader path from config, also put render stuff in renderer
 	char *shader_vert_path = "build/src/platinum/shaders/shader_vert.spv";
-	uint shader_vert_size = e_file_get_size(shader_vert_path);
+	uint shader_vert_size = p_file_get_size(shader_vert_path);
 	char *shader_vert_data = malloc(shader_vert_size * sizeof(char));
-	e_file_read(shader_vert_path, shader_vert_data, shader_vert_size);
+	p_file_read(shader_vert_path, shader_vert_data, shader_vert_size);
 
 	char *shader_frag_path = "build/src/platinum/shaders/shader_frag.spv";
-	uint shader_frag_size = e_file_get_size(shader_frag_path);
+	uint shader_frag_size = p_file_get_size(shader_frag_path);
 	char *shader_frag_data = malloc(shader_frag_size * sizeof(char));
-	e_file_read(shader_frag_path, shader_frag_data, shader_frag_size);
+	p_file_read(shader_frag_path, shader_frag_data, shader_frag_size);
 
 
 	if (vulkan_display_data->shaders != NULL)
@@ -1164,12 +1130,11 @@ void p_vulkan_display_create(PWindowData *window_data, const PGraphicalAppData *
 }
 
 /**
- * p_vulkan_display_destroy
+ * p_graphics_vulkan_display_destroy
  *
  * Destroys the vulkan_display_data
  */
-PLATINUM_API
-void p_vulkan_display_destroy(PVulkanDisplayData *vulkan_display_data)
+void p_graphics_vulkan_display_destroy(PGraphicalDisplayData vulkan_display_data)
 {
 
 	for (uint i = 0; i < vulkan_display_data->shaders->num_items; i++)

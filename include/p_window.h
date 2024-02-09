@@ -1,7 +1,7 @@
 #ifndef _PLATINUM_WINDOW_H
 #define _PLATINUM_WINDOW_H
 
-#include "enigma.h"
+#include <enigma.h>
 #include "p_graphics.h"
 #include "p_util.h"
 #include <wchar.h>
@@ -78,7 +78,7 @@ struct PWindowData{
 	PThread event_manager;
 	PEventCalls *event_calls;
 	PDisplayInfo *display_info;
-	PGraphicalDisplayData *graphical_display_data;
+	PGraphicalDisplayData graphical_display_data;
 };
 
 /**
@@ -105,6 +105,9 @@ void p_window_docked_fullscreen(PWindowData *window_data);
 void p_window_windowed(PWindowData *window_data, uint x, uint y, uint width, uint height);
 void p_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height);
 void p_window_set_name(PDisplayInfo *display_info, const wchar_t *name);
+void p_window_set_icon(PDisplayInfo *display_info, uint32_t *icon);
+void p_window_set_graphical_display(PWindowData *window_data, PGraphicalAppData graphical_app_data,
+		PGraphicalDisplayData graphical_display_data);
 
 #ifdef PLATINUM_DISPLAY_WIN32
 
@@ -115,9 +118,11 @@ void p_win32_window_docked_fullscreen(PWindowData *window_data);
 void p_win32_window_windowed(PWindowData *window_data, uint x, uint y, uint width, uint height);
 void p_win32_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height);
 void p_win32_window_set_name(PDisplayInfo *display_info, const wchar_t *name);
+void p_win32_window_set_icon(PDisplayInfo *display_info, uint32_t *icon);
+void p_win32_window_set_graphical_display(PWindowData *window_data, PGraphicalAppData graphical_app_data,
+		PGraphicalDisplayData graphical_display_data);
 
-#endif // PLATINUM_DISPLAY_WIN32
-#ifdef PLATINUM_DISPLAY_X11
+#elif defined PLATINUM_DISPLAY_X11
 
 void p_x11_window_create(PAppData *app_data, const PWindowRequest window_request);
 void p_x11_window_close(PWindowData *window_data);
@@ -126,9 +131,11 @@ void p_x11_window_docked_fullscreen(PWindowData *window_data);
 void p_x11_window_windowed(PWindowData *window_data, uint x, uint y, uint width, uint height);
 void p_x11_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height);
 void p_x11_window_set_name(PDisplayInfo *display_info, const wchar_t *name);
+void p_x11_window_set_icon(PDisplayInfo *display_info, uint32_t *icon);
+void p_x11_window_set_graphical_display(PWindowData *window_data, PGraphicalAppData graphical_app_data,
+		PGraphicalDisplayData graphical_display_data);
 
-#endif // PLATINUM_DISPLAY_X11
-#ifdef PLATINUM_DISPLAY_WAYLAND
+#elif defined PLATINUM_DISPLAY_WAYLAND
 
 void p_wayland_window_create(PAppData *app_data, const PWindowRequest window_request);
 void p_wayland_window_close(PWindowData *window_data);
@@ -137,7 +144,10 @@ void p_wayland_window_docked_fullscreen(PWindowData *window_data);
 void p_wayland_window_windowed(PWindowData *window_data, uint x, uint y, uint width, uint height);
 void p_wayland_window_set_dimensions(PDisplayInfo *display_info, uint x, uint y, uint width, uint height);
 void p_wayland_window_set_name(PDisplayInfo *display_info, const wchar_t *name);
+void p_wayland_window_set_icon(PDisplayInfo *display_info, uint32_t *icon);
+void p_wayland_window_set_graphical_display(PWindowData *window_data, PGraphicalAppData graphical_app_data,
+		PGraphicalDisplayData graphical_display_data);
 
-#endif // PLATINUM_DISPLAY_WAYLAND
+#endif // PLATINUM_DISPLAY
 
 #endif // _PLATINUM_WINDOW_H

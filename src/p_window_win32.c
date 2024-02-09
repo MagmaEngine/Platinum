@@ -1,6 +1,13 @@
 #include "platinum.h"
 #include <windows.h>
 
+#ifdef PLATINUM_BACKEND_VULKAN
+#include "p_graphics_vulkan.h"
+#endif // PLATINUM_BACKEND
+
+// Forward function declarations for internal functions
+void _window_close(PAppData *app_data, PWindowData *window_data);
+
 // Internal Enums
 
 // Internal Structs
@@ -25,10 +32,9 @@ struct PDisplayInfo{
 
 static HANDLE window_creation_event;
 
-// Internal Functions
-
+// Forward function declarations for internal functions
 static void _win32_window_close(PAppInstance *app_instance, PWindowData *window_data);
-static PThreadResult WINAPI p_win32_window_event_manage(PThreadArguments args);
+static PThreadResult WINAPI _win32_window_event_manage(PThreadArguments args);
 
 /**
  * WindowProc
@@ -173,7 +179,7 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 			if (window_data->status == P_WINDOW_STATUS_ALIVE)
 				window_data->status = P_WINDOW_STATUS_CLOSE;
 			p_mutex_unlock(app_instance->window_mutex);
-			_win32_window_close(app_instance, window_data);
+			_window_close(app_instance, window_data);
 			return 0;
 		}
 
@@ -250,7 +256,7 @@ PLATINUM_API void p_win32_window_create(PAppInstance *app_instance, const PWindo
 	PThreadArguments args = malloc(sizeof (PAppInstance *) + sizeof (PWindowData *));
 	memcpy(args, &app_instance, sizeof (PAppInstance **));
 	memcpy(&((char *)args)[sizeof (PAppInstance **)], &window_data, sizeof (PWindowData **));
-	window_data->event_manager = p_thread_create(p_win32_window_event_manage, args);
+	window_data->event_manager = p_thread_create(_win32_window_event_manage, args);
 
 	DWORD result = WaitForSingleObject(window_creation_event, INFINITE);
 	if (result != WAIT_OBJECT_0)
@@ -282,7 +288,7 @@ PLATINUM_API void p_win32_window_close(PWindowData *window_data)
  *
  * internal close function that actually closes the window and frees data
  */
-static void _win32_window_close(PAppInstance *app_instance, PWindowData *window_data)
+void _win32_window_close(PAppInstance *app_instance, PWindowData *window_data)
 {
 	// If window exists delete it.
 	p_mutex_lock(app_instance->window_mutex);
@@ -306,13 +312,13 @@ static void _win32_window_close(PAppInstance *app_instance, PWindowData *window_
 }
 
 /**
- * p_win32_window_event_manage
+ * _win32_window_event_manage
  *
  * Windows Specific: actually creates the window because windows is stupid.
  * This function runs in its own thread and manages window manager events
  * returns 0
  */
-static PThreadResult WINAPI p_win32_window_event_manage(PThreadArguments args)
+PThreadResult WINAPI _win32_window_event_manage(PThreadArguments args)
 {
 	PAppInstance *app_instance = ((PAppInstance **)args)[0];
 	PWindowData *window_data = *(PWindowData **)&((char *)args)[sizeof (PAppInstance **)];
@@ -371,7 +377,7 @@ static PThreadResult WINAPI p_win32_window_event_manage(PThreadArguments args)
 		DispatchMessage(&msg);
 	}
 	free(args);
-	p_win32_window_close(window_data);
+	p_window_close(window_data);
 	return 0;
 }
 
@@ -440,4 +446,24 @@ PLATINUM_API void p_win32_window_windowed(PWindowData *window_data, uint x, uint
 	window_data->display_type = P_DISPLAY_WINDOWED;
 	ShowWindow(window_data->display_info->hwnd, SW_SHOWNORMAL);
 	UpdateWindow(window_data->display_info->hwnd);
+}
+
+/**
+ * p_x11_window_set_graphical_display
+ *
+ * adds a graphical surface to the window display
+ */
+void p_win32_window_set_graphical_display(PWindowData *window_data, PGraphicalAppData graphical_app_data,
+		PGraphicalDisplayData graphical_display_data)
+{
+	VkWin32SurfaceCreateInfoKHR vk_surface_create_info;
+	vk_surface_create_info.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+	vk_surface_create_info.hwnd = window_data->display_info->hwnd;
+	vk_surface_create_info.hinstance = window_data->display_info->hInstance;
+	if (vkCreateWin32SurfaceKHR(vulkan_app_data->instance, &vk_surface_create_info, NULL, vulkan_display_data->surface)
+			!= VK_SUCCESS)
+	{
+		p_log_message(P_LOG_ERROR, L"Vulkan General", L"Failed to create Win32 surface!");
+		exit(1);
+	}
 }

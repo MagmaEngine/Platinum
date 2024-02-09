@@ -14,15 +14,14 @@ PAppData *p_app_init(PAppRequest app_request)
 {
 	setlocale(LC_ALL, "");
 
-	p_mutex_init(&debug_memory_mutex);
+	debug_memory_mutex = p_mutex_init();
 	p_debug_memory_init(&debug_memory_mutex);
 
 	PAppData *app_data = malloc(sizeof *app_data);
 	app_data->app_config = app_request.app_config;
 
 	// init window mutex
-	app_data->window_mutex = malloc(sizeof *app_data->window_mutex);
-	p_mutex_init(app_data->window_mutex);
+	app_data->window_mutex = p_mutex_init();
 
 	// create the window array
 	app_data->window_data = e_dynarr_init(sizeof (PWindowData *), 1);
@@ -73,10 +72,8 @@ void p_app_deinit(PAppData *app_data)
 	//p_event_deinit(app_data->input_manager);
 	p_graphics_deinit(app_data->graphical_app_data);
 
-	free(app_data->window_mutex);
 	free(app_data);
 
 	p_debug_mem_print(0);
-	p_mutex_destroy(&debug_memory_mutex);
-
+	p_mutex_destroy(debug_memory_mutex);
 }

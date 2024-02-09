@@ -10,26 +10,15 @@ typedef unsigned int uint;
 #endif // _UINT
 
 // ------------- Threads ---------------
-#ifdef PLATINUM_PLATFORM_WINDOWS
+struct PThread;
+struct PMutex;
+//struct PThreadResult;
 
-#include <windows.h>
-typedef HANDLE PThread;
-typedef void *PThreadArguments;
-typedef DWORD PThreadResult;
-typedef PThreadResult (*PThreadFunction)(void *);
-typedef CRITICAL_SECTION EMutex;
-
-#endif // PLATINUM_PLATFORM_WINDOWS
-#ifdef PLATINUM_PLATFORM_LINUX
-
-#include <pthread.h>
-typedef pthread_t PThread;
-typedef void *PThreadArguments;
+typedef struct PThread *PThread;
+typedef struct PMutex *PMutex;
 typedef void *PThreadResult;
+typedef void *PThreadArguments;
 typedef PThreadResult (*PThreadFunction)(void *);
-typedef pthread_mutex_t PMutex;
-
-#endif // PLATINUM_PLATFORM_LINUX
 
 // ------------ Logging -------------
 enum PLogLevel {
@@ -50,15 +39,16 @@ bool p_file_read(const char *filename, void *buffer, uint size);
 
 
 void p_sleep_ms(uint milis);
-void p_mutex_lock(PMutex *mutex);
-void p_mutex_unlock(PMutex *mutex);
-void p_mutex_init(PMutex *mutex);
-void p_mutex_destroy(PMutex *mutex);
+void p_mutex_lock(PMutex mutex);
+void p_mutex_unlock(PMutex mutex);
+PMutex p_mutex_init(void);
+void p_mutex_destroy(PMutex mutex);
 
 PThread p_thread_create(PThreadFunction func, PThreadArguments args);
 PThread p_thread_self(void);
-void p_thread_join(PThread thread);
 void p_thread_detach(PThread thread);
+void p_thread_discard(PThread thread);
+void p_thread_join(PThread thread);
 
 /* ----- Debugging -----
 If PLATINUM_DEBUG_MEMORY is enabled, the memory debugging system will create macros that replace malloc, free and realloc and allows the system to keep track of and report where memory is beeing allocated, how much and if the memory is beeing freed. This is very useful for finding memory leaks in large applications. The system can also over allocate memory and fill it with a magic number and can therfor detect if the application writes outside of the allocated memory. if PLATINUM_EXIT_CRASH is defined, then exit(); will be replaced with a funtion that writes to NULL. This will make it trivial ti find out where an application exits using any debugger., */
