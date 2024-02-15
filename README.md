@@ -24,5 +24,30 @@ udev/evdev Raw input
 Vulkan
 ncurses
 
+Settings
+ * Instance
+    - headless
+ * Display
+    - Swapchain
+        - alpha
+        - clipping
+        - Stereoscopic
+        - image count
+        - present mode
+        - post processing
+    - Image views
+        - color component swizzle
+        - aspect mask
+        - mipmap level
+    - Rasterizer
+        - Culling
+        - Depth
+        - Clamping
+        - Polygon render mode
+    - Multisampling
+        - color blend mode
+        - anti aliasing
+    - Render pass
+
 ### Logging
 Color output
