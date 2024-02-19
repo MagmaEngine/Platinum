@@ -88,6 +88,7 @@ struct PGraphicalDisplayData{
 	VkFormat swapchain_format;
 	EDynarr *swapchain_images; // contains VkImage
 	EDynarr *swapchain_image_views; // contains VkImageView
+	VkPipelineLayout pipeline_layout;
 
 	EDynarr *shaders; // contains VkShaderModule. TODO: move this to renderer
 };

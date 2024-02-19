@@ -1,6 +1,6 @@
 #include "platinum.h"
 #include <string.h>
-#include "p_graphics_vulkan.h"
+#include "_graphics_vulkan.h"
 
 /**
  * _vulkan_app_request_convert
@@ -416,11 +416,11 @@ static VkPhysicalDeviceFeatures _vulkan_get_required_features(const PVulkanDispl
 	if (vulkan_display_request->required_features.sparseResidencyAliased && !device_features.sparseResidencyAliased) e_dynarr_add(missing_features, L"sparseResidencyAliased");
 	if (vulkan_display_request->required_features.variableMultisampleRate && !device_features.variableMultisampleRate) e_dynarr_add(missing_features, L"variableMultisampleRate");
 	if (vulkan_display_request->required_features.inheritedQueries && !device_features.inheritedQueries) e_dynarr_add(missing_features, L"inheritedQueries");
-	if (missing_features->num_items > 0)
+	if (e_dynarr_item_count(missing_features) > 0)
 	{
 		p_log_message(P_LOG_ERROR, L"Phantom", L"Vulkan required features not supported");
-		for (uint i = 0; i < missing_features->num_items; i++)
-			p_log_message(P_LOG_ERROR, L"Phantom", L"\t%ls", E_DYNARR_GET(missing_features, wchar_t *, i));
+		for (uint i = 0; i < e_dynarr_item_count(missing_features); i++)
+			p_log_message(P_LOG_ERROR, L"Phantom", L"\t%ls", e_dynarr_get(missing_features, wchar_t *, i));
 		exit(1);
 	}
 	e_dynarr_deinit(missing_features);
@@ -471,10 +471,10 @@ static VkQueueFlags _vulkan_get_required_queue_flags(const PVulkanDisplayRequest
  */
 static EDynarr *_vulkan_get_required_extensions(const EDynarr * const required_extensions)
 {
-	EDynarr *extensions = e_dynarr_init(sizeof (char *), required_extensions->num_items);
-	for (uint i = 0; i < required_extensions->num_items; i++)
+	EDynarr *extensions = e_dynarr_init(sizeof (char *), e_dynarr_item_count(required_extensions));
+	for (uint i = 0; i < e_dynarr_item_count(required_extensions); i++)
 	{
-		char *extension = E_DYNARR_GET(required_extensions, char *, i);
+		char *extension = e_dynarr_get(required_extensions, char *, i);
 		if(_vulkan_extension_exists(extension))
 			e_dynarr_add(extensions, E_VOID_PTR_FROM_VALUE(char *, extension));
 		else
@@ -494,10 +494,10 @@ static EDynarr *_vulkan_get_required_extensions(const EDynarr * const required_e
  */
 EDynarr *_vulkan_get_required_layers(const EDynarr * const required_layers)
 {
-	EDynarr *enabled_layers = e_dynarr_init(sizeof (char *), required_layers->num_items);
-	for (uint i = 0; i < required_layers->num_items; i++)
+	EDynarr *enabled_layers = e_dynarr_init(sizeof (char *), e_dynarr_item_count(required_layers));
+	for (uint i = 0; i < e_dynarr_item_count(required_layers); i++)
 	{
-		char *layer = E_DYNARR_GET(required_layers, char *, i);
+		char *layer = e_dynarr_get(required_layers, char *, i);
 		if(_vulkan_layer_exists(layer))
 			e_dynarr_add(enabled_layers, E_VOID_PTR_FROM_VALUE(char *,layer));
 		else
@@ -583,19 +583,19 @@ static void _vulkan_swapchain_create(
 		exit(1);
 	}
 	vkGetSwapchainImagesKHR(vulkan_display_data->logical_device, vulkan_display_data->swapchain, &image_count, NULL);
-	vulkan_display_data->swapchain_images = e_dynarr_init(sizeof (VkImage), image_count);
-	vulkan_display_data->swapchain_images->num_items = image_count;
+	VkImage swapchain_images[image_count];
 	vkGetSwapchainImagesKHR(vulkan_display_data->logical_device, vulkan_display_data->swapchain, &image_count,
-			vulkan_display_data->swapchain_images->arr);
+			swapchain_images);
+	vulkan_display_data->swapchain_images = e_dynarr_init_arr(sizeof (VkImage), image_count, swapchain_images);
 
 	// Create image views
 	vulkan_display_data->swapchain_image_views = e_dynarr_init(sizeof (VkImageView), image_count);
-	vulkan_display_data->swapchain_image_views->num_items = image_count;
+
 	for (uint i = 0; i < image_count; i++)
 	{
 		VkImageViewCreateInfo image_view_create_info = {0};
 		image_view_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-		image_view_create_info.image = E_DYNARR_GET(vulkan_display_data->swapchain_images, VkImage, i);
+		image_view_create_info.image = e_dynarr_get(vulkan_display_data->swapchain_images, VkImage, i);
 		image_view_create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
 		image_view_create_info.format = vulkan_display_data->swapchain_format;
 		image_view_create_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -608,12 +608,13 @@ static void _vulkan_swapchain_create(
 		image_view_create_info.subresourceRange.baseArrayLayer = 0;
 		image_view_create_info.subresourceRange.layerCount = 1;
 
-		if (vkCreateImageView(vulkan_display_data->logical_device, &image_view_create_info, NULL,
-				&E_DYNARR_GET(vulkan_display_data->swapchain_image_views, VkImageView, i)) != VK_SUCCESS)
+		VkImageView image_view;
+		if (vkCreateImageView(vulkan_display_data->logical_device, &image_view_create_info, NULL, &image_view) != VK_SUCCESS)
 		{
 			p_log_message(P_LOG_ERROR, L"Vulkan General", L"Failed to create image view!");
 			exit(1);
 		}
+		e_dynarr_add(vulkan_display_data->swapchain_image_views, &image_view);
 	}
 
 }
@@ -637,15 +638,14 @@ static PVulkanSwapchainSupport _vulkan_swapchain_auto_pick(const VkPhysicalDevic
 	vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface, &format_count, NULL);
 	if (format_count != 0)
 	{
-		EDynarr *formats = e_dynarr_init(sizeof (VkSurfaceFormatKHR), format_count);
-		vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface, &format_count, formats->arr);
-		formats->num_items = format_count;
+		VkSurfaceFormatKHR formats[format_count];
+		vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface, &format_count, formats);
+		EDynarr *surface_formats = e_dynarr_init_arr(sizeof (VkSurfaceFormatKHR), format_count, formats);
 
-
-		VkSurfaceFormatKHR format = E_DYNARR_GET(formats, VkSurfaceFormatKHR, 0);
+		VkSurfaceFormatKHR format = e_dynarr_get(surface_formats, VkSurfaceFormatKHR, 0);
 		for (uint i = 0; i < format_count; i++)
 		{
-			VkSurfaceFormatKHR current_format = E_DYNARR_GET(formats, VkSurfaceFormatKHR, i);
+			VkSurfaceFormatKHR current_format = e_dynarr_get(surface_formats, VkSurfaceFormatKHR, i);
 			if (current_format.format == VK_FORMAT_B8G8R8A8_SRGB)
 			{
 				format = current_format;
@@ -654,7 +654,7 @@ static PVulkanSwapchainSupport _vulkan_swapchain_auto_pick(const VkPhysicalDevic
 		}
 		swapchain_support.format = malloc(sizeof (VkSurfaceFormatKHR));
 		*swapchain_support.format = format;
-		e_dynarr_deinit(formats);
+		e_dynarr_deinit(surface_formats);
 	}
 
 	// Set present mode
@@ -662,14 +662,14 @@ static PVulkanSwapchainSupport _vulkan_swapchain_auto_pick(const VkPhysicalDevic
 	vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &present_mode_count, NULL);
 	if (present_mode_count != 0)
 	{
-		EDynarr *present_modes = e_dynarr_init(sizeof (VkPresentModeKHR), present_mode_count);
-		vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &present_mode_count, present_modes->arr);
-		present_modes->num_items = present_mode_count;
+		VkPresentModeKHR modes[present_mode_count];
+		vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &present_mode_count, modes);
+		EDynarr *present_modes = e_dynarr_init_arr(sizeof (VkPresentModeKHR), present_mode_count, modes);
 
-		VkPresentModeKHR present_mode = E_DYNARR_GET(present_modes, VkPresentModeKHR, 0);
+		VkPresentModeKHR present_mode = e_dynarr_get(present_modes, VkPresentModeKHR, 0);
 		for (uint i = 0; i < present_mode_count; i++)
 		{
-			VkPresentModeKHR current_present_mode = E_DYNARR_GET(present_modes, VkPresentModeKHR, i);
+			VkPresentModeKHR current_present_mode = e_dynarr_get(present_modes, VkPresentModeKHR, i);
 			if (current_present_mode == VK_PRESENT_MODE_MAILBOX_KHR)
 			{
 				present_mode = current_present_mode;
@@ -741,11 +741,11 @@ void p_graphics_vulkan_device_set(
 	for (uint i = 0; i < P_VULKAN_QUEUE_TYPE_MAX; i++)
 	{
 		bool unique = true;
-		for (uint j = 0; j < queue_family_infos->num_items; j++)
+		for (uint j = 0; j < e_dynarr_item_count(queue_family_infos); j++)
 		{
-			if ((E_DYNARR_GET(queue_family_infos, PVulkanQueueFamilyInfo, j).exists) &&
+			if ((e_dynarr_get(queue_family_infos, PVulkanQueueFamilyInfo, j).exists) &&
 				vulkan_display_data->queue_family_infos[i].index ==
-				E_DYNARR_GET(queue_family_infos, PVulkanQueueFamilyInfo, j).index)
+				e_dynarr_get(queue_family_infos, PVulkanQueueFamilyInfo, j).index)
 			{
 				unique = false;
 				break;
@@ -755,13 +755,13 @@ void p_graphics_vulkan_device_set(
 			e_dynarr_add(queue_family_infos, &vulkan_display_data->queue_family_infos[i]);
 	}
 
-	uint num_queue_families = queue_family_infos->num_items;
+	const uint num_queue_families = e_dynarr_item_count(queue_family_infos);
 	VkDeviceQueueCreateInfo queue_create_infos[num_queue_families];
 	memset(queue_create_infos, 0, sizeof queue_create_infos);
-	for (uint i = 0; i < queue_family_infos->num_items; i++)
+	for (uint i = 0; i < num_queue_families; i++)
 	{
 		queue_create_infos[i].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-		queue_create_infos[i].queueFamilyIndex = E_DYNARR_GET(queue_family_infos, PVulkanQueueFamilyInfo, i).index;
+		queue_create_infos[i].queueFamilyIndex = e_dynarr_get(queue_family_infos, PVulkanQueueFamilyInfo, i).index;
 		queue_create_infos[i].queueCount = 1;
 		queue_create_infos[i].pQueuePriorities = E_PTR_FROM_VALUE(float, 1.f);
 	}
@@ -777,28 +777,28 @@ void p_graphics_vulkan_device_set(
 	device_create_info.pEnabledFeatures = &device_features;
 
 	EDynarr *enabled_extensions = _vulkan_get_required_extensions(vulkan_display_request->required_extensions);
-	device_create_info.enabledExtensionCount = enabled_extensions->num_items;
-	device_create_info.ppEnabledExtensionNames = enabled_extensions->arr;
+	device_create_info.enabledExtensionCount = e_dynarr_item_count(enabled_extensions);
+	device_create_info.ppEnabledExtensionNames = e_dynarr_get_arr(enabled_extensions);
 
 	EDynarr *enabled_layers = _vulkan_get_required_layers(vulkan_display_request->required_layers);
-	device_create_info.enabledLayerCount = enabled_layers->num_items;
-	device_create_info.ppEnabledLayerNames = enabled_layers->arr;
+	device_create_info.enabledLayerCount = e_dynarr_item_count(enabled_layers);
+	device_create_info.ppEnabledLayerNames = e_dynarr_get_arr(enabled_layers);
 
 	_vulkan_display_request_destroy(vulkan_display_request);
 
 	// Set logical device queues
 	EDynarr *device_queue_create_infos = e_dynarr_init(sizeof (VkDeviceQueueCreateInfo), 1);
-	for (uint i = 0; i < queue_family_infos->num_items; i++)
+	for (uint i = 0; i < e_dynarr_item_count(queue_family_infos); i++)
 	{
 		VkDeviceQueueCreateInfo queue_create_info = {0};
 		queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-		queue_create_info.queueFamilyIndex = E_DYNARR_GET(queue_family_infos, PVulkanQueueFamilyInfo, i).index;
+		queue_create_info.queueFamilyIndex = e_dynarr_get(queue_family_infos, PVulkanQueueFamilyInfo, i).index;
 		queue_create_info.queueCount = 1;
 		queue_create_info.pQueuePriorities = E_PTR_FROM_VALUE(float, 1.f);
 		e_dynarr_add(device_queue_create_infos, &queue_create_info);
 	}
-	device_create_info.queueCreateInfoCount = device_queue_create_infos->num_items;
-	device_create_info.pQueueCreateInfos = device_queue_create_infos->arr;
+	device_create_info.queueCreateInfoCount = e_dynarr_item_count(device_queue_create_infos);
+	device_create_info.pQueueCreateInfos = e_dynarr_get_arr(device_queue_create_infos);
 
 	// create logical device
 	if (vulkan_display_data->logical_device != VK_NULL_HANDLE)
@@ -853,16 +853,19 @@ PGraphicalDevice p_graphics_vulkan_device_auto_pick(
 
 	if (vulkan_display_data->compatible_devices != NULL)
 		e_dynarr_deinit(vulkan_display_data->compatible_devices);
-	vulkan_display_data->compatible_devices = e_dynarr_init(sizeof (VkPhysicalDevice), vulkan_available_device_count);
+	{
+		VkPhysicalDevice compatible_devices[vulkan_available_device_count];
+		vkEnumeratePhysicalDevices(vulkan_app_data->instance, &vulkan_available_device_count, compatible_devices);
+		vulkan_display_data->compatible_devices = e_dynarr_init_arr(sizeof (VkPhysicalDevice),
+				vulkan_available_device_count, compatible_devices);
+	}
 	EDynarr *compatible_devices = vulkan_display_data->compatible_devices;
-	vkEnumeratePhysicalDevices(vulkan_app_data->instance, &vulkan_available_device_count, compatible_devices->arr);
-	compatible_devices->num_items = vulkan_available_device_count;
 
 	// check device suitability, assign scores
-	EDynarr *device_score = e_dynarr_init(sizeof (int), compatible_devices->num_items);
-	for (uint i = 0; i < compatible_devices->num_items; i++) {
+	EDynarr *device_score = e_dynarr_init(sizeof (int), e_dynarr_item_count(compatible_devices));
+	for (uint i = 0; i < e_dynarr_item_count(compatible_devices); i++) {
 		int score = 0;
-		VkPhysicalDevice device = E_DYNARR_GET(compatible_devices, VkPhysicalDevice, i);
+		VkPhysicalDevice device = e_dynarr_get(compatible_devices, VkPhysicalDevice, i);
 		VkPhysicalDeviceProperties device_properties = {0};
 		vkGetPhysicalDeviceProperties(device, &device_properties);
 
@@ -898,9 +901,9 @@ end_device_score_eval:
 	// remove incompatible gpus and set default gpu
 	int max_score = 0;
 	int max_score_index = -1;
-	for (uint i = 0; i < compatible_devices->num_items;)
+	for (uint i = 0; i < e_dynarr_item_count(compatible_devices);)
 	{
-		int current_device_score = E_DYNARR_GET(device_score, int, i);
+		int current_device_score = e_dynarr_get(device_score, int, i);
 		if (current_device_score > max_score)
 		{
 			max_score = current_device_score;
@@ -918,7 +921,7 @@ end_device_score_eval:
 	if (max_score_index >= 0)
 	{
 		PGraphicalDevice device = (PGraphicalDevice){0};
-		device.handle = E_DYNARR_GET(compatible_devices, VkPhysicalDevice, max_score_index);
+		device.handle = e_dynarr_get(compatible_devices, VkPhysicalDevice, max_score_index);
 		VkPhysicalDeviceProperties device_properties;
 		vkGetPhysicalDeviceProperties(device.handle, &device_properties);
 		device.name = device_properties.deviceName;
@@ -958,12 +961,12 @@ PGraphicalAppData p_graphics_vulkan_init(PGraphicalAppRequest *graphical_app_req
 
 	// Add all required extensions and optional extensions that exist
 	EDynarr *enabled_extensions = _vulkan_get_required_extensions(vulkan_app_request->required_extensions);
-	vk_instance_create_info.enabledExtensionCount = enabled_extensions->num_items;
-	vk_instance_create_info.ppEnabledExtensionNames = enabled_extensions->arr;
+	vk_instance_create_info.enabledExtensionCount = e_dynarr_item_count(enabled_extensions);
+	vk_instance_create_info.ppEnabledExtensionNames = e_dynarr_get_arr(enabled_extensions);
 
 	EDynarr *enabled_layers = _vulkan_get_required_layers(vulkan_app_request->required_layers);
-	vk_instance_create_info.enabledLayerCount = enabled_layers->num_items;
-	vk_instance_create_info.ppEnabledLayerNames = enabled_layers->arr;
+	vk_instance_create_info.enabledLayerCount = e_dynarr_item_count(enabled_layers);
+	vk_instance_create_info.ppEnabledLayerNames = e_dynarr_get_arr(enabled_layers);
 	vk_instance_create_info.flags = 0;
 
 	_vulkan_app_request_destroy(vulkan_app_request);
@@ -1029,6 +1032,164 @@ VkShaderModule _create_shader_module(PGraphicalDisplayData vulkan_display_data, 
 	return shader_module;
 }
 
+/**
+ * _graphics_vulkan_pipeline_init
+ *
+ * Initializes the pipeline for vulkan
+ */
+void _graphics_vulkan_pipeline_init(PGraphicalDisplayData vulkan_display_data)
+{
+	// TODO: refactor this to get shader path from config, also put render stuff in renderer
+	char *shader_vert_path = "build/src/platinum/shaders/shader_vert.spv";
+	uint shader_vert_size = p_file_get_size(shader_vert_path);
+	char *shader_vert_data = malloc(shader_vert_size * sizeof(char));
+	p_file_read(shader_vert_path, shader_vert_data, shader_vert_size);
+
+	char *shader_frag_path = "build/src/platinum/shaders/shader_frag.spv";
+	uint shader_frag_size = p_file_get_size(shader_frag_path);
+	char *shader_frag_data = malloc(shader_frag_size * sizeof(char));
+	p_file_read(shader_frag_path, shader_frag_data, shader_frag_size);
+
+	if (vulkan_display_data->shaders != NULL)
+		e_dynarr_deinit(vulkan_display_data->shaders);
+	vulkan_display_data->shaders = e_dynarr_init(sizeof (VkShaderModule), 2);
+
+	VkShaderModule vertShaderModule = _create_shader_module(vulkan_display_data, shader_vert_data, shader_vert_size);
+	VkShaderModule fragShaderModule = _create_shader_module(vulkan_display_data, shader_frag_data, shader_frag_size);
+	free(shader_vert_data);
+	free(shader_frag_data);
+
+	e_dynarr_add(vulkan_display_data->shaders, &vertShaderModule);
+	e_dynarr_add(vulkan_display_data->shaders, &fragShaderModule);
+
+	VkPipelineShaderStageCreateInfo vertex_shader_stage_info = {0};
+	vertex_shader_stage_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	vertex_shader_stage_info.stage = VK_SHADER_STAGE_VERTEX_BIT;
+	vertex_shader_stage_info.module = vertShaderModule;
+	vertex_shader_stage_info.pName = "main";
+
+	VkPipelineShaderStageCreateInfo fragment_shader_stage_info = {0};
+	fragment_shader_stage_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	fragment_shader_stage_info.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	fragment_shader_stage_info.module = fragShaderModule;
+	fragment_shader_stage_info.pName = "main";
+
+	VkPipelineShaderStageCreateInfo shader_stage_infos[] = {vertex_shader_stage_info, fragment_shader_stage_info};
+
+	// TODO: make vertex input data real
+	// https://docs.vulkan.org/tutorial/latest/03_Drawing_a_triangle/02_Graphics_pipeline_basics/02_Fixed_functions.html#_vertex_input
+	VkPipelineVertexInputStateCreateInfo vertex_input_info = {0};
+	vertex_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+	vertex_input_info.vertexBindingDescriptionCount = 0;
+	vertex_input_info.pVertexBindingDescriptions = NULL;
+	vertex_input_info.vertexAttributeDescriptionCount = 0;
+	vertex_input_info.pVertexAttributeDescriptions = NULL;
+
+	VkPipelineInputAssemblyStateCreateInfo input_assembly = {0};
+	input_assembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+	input_assembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	input_assembly.primitiveRestartEnable = VK_FALSE;
+
+	// TODO: make viewport configurable for different UI elements
+	// (draggable columns, addable elements, etc) (like the blender editor ui)
+	VkViewport viewport = {0};
+	viewport.x = 0.0f;
+	viewport.y = 0.0f;
+	viewport.width = (float) vulkan_display_data->swapchain_extent.width;
+	viewport.height = (float) vulkan_display_data->swapchain_extent.height;
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+
+	// TODO: make scissor configurable for different UI elements
+	// just like the viewport. It should be the same size as the viewport
+	VkRect2D scissor = {0};
+	scissor.offset = (VkOffset2D){0, 0};
+	scissor.extent = vulkan_display_data->swapchain_extent;
+
+	EDynarr *dynamic_states = e_dynarr_init_arr(sizeof (VkDynamicState), 2,
+			(VkDynamicState[]) {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR} );
+
+	VkPipelineDynamicStateCreateInfo dynamic_state = {0};
+	dynamic_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+	dynamic_state.dynamicStateCount = e_dynarr_item_count(dynamic_states);
+	dynamic_state.pDynamicStates = e_dynarr_get_arr(dynamic_states);
+
+	// TODO: find a way to make this dynamic
+	// so the user can create different viewports and scissors
+	VkPipelineViewportStateCreateInfo viewport_state = {0};
+	viewport_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+	viewport_state.viewportCount = 1;
+	viewport_state.pViewports = &viewport;
+	viewport_state.scissorCount = 1;
+	viewport_state.pScissors = &scissor;
+
+	VkPipelineRasterizationStateCreateInfo rasterizer = {0};
+	rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+	// TODO: Might be useful for shadow maps. Requires depthClamp feature in VkPhysicalDeviceFeatures
+	rasterizer.depthClampEnable = VK_FALSE;
+	// TODO: make this configurable. Any other mode requires a gpu feature. Might be useful for wireframe and/or point clouds
+	rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+	rasterizer.lineWidth = 1.0f;
+	// TODO: make culling configurable
+	rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+	rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+	rasterizer.depthBiasEnable = VK_FALSE;
+	rasterizer.depthBiasConstantFactor = 0.0f;
+	rasterizer.depthBiasClamp = 0.0f;
+	rasterizer.depthBiasSlopeFactor = 0.0f;
+
+	VkPipelineMultisampleStateCreateInfo multisampling = {0};
+	// TODO: make multisampling (anti-aliasing) configurable. Requires a gpu feature
+	multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+	multisampling.sampleShadingEnable = VK_FALSE;
+	multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+	multisampling.minSampleShading = 1.0f;
+	multisampling.pSampleMask = NULL;
+	multisampling.alphaToCoverageEnable = VK_FALSE;
+	multisampling.alphaToOneEnable = VK_FALSE;
+
+	// TODO: make color blending configurable
+	VkPipelineColorBlendAttachmentState color_blend_attachment = {0};
+	color_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
+		| VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+	color_blend_attachment.blendEnable = VK_FALSE;
+	color_blend_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+	color_blend_attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
+	color_blend_attachment.colorBlendOp = VK_BLEND_OP_ADD;
+	color_blend_attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+	color_blend_attachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+	color_blend_attachment.alphaBlendOp = VK_BLEND_OP_ADD;
+
+	VkPipelineColorBlendStateCreateInfo color_blending = {0};
+	color_blending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+	color_blending.logicOpEnable = VK_TRUE;
+	color_blending.logicOp = VK_LOGIC_OP_COPY;
+	color_blending.attachmentCount = 1;
+	color_blending.pAttachments = &color_blend_attachment;
+	color_blending.blendConstants[0] = 0.0f;
+	color_blending.blendConstants[1] = 0.0f;
+	color_blending.blendConstants[2] = 0.0f;
+	color_blending.blendConstants[3] = 0.0f;
+
+	VkPipelineLayoutCreateInfo pipeline_layout_info = {0};
+	pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	pipeline_layout_info.setLayoutCount = 0;
+	pipeline_layout_info.pSetLayouts = NULL;
+	pipeline_layout_info.pushConstantRangeCount = 0;
+	pipeline_layout_info.pPushConstantRanges = NULL;
+
+	if (vulkan_display_data->pipeline_layout != NULL)
+		vkDestroyPipelineLayout(vulkan_display_data->logical_device, vulkan_display_data->pipeline_layout, NULL);
+	if (vkCreatePipelineLayout(vulkan_display_data->logical_device, &pipeline_layout_info, NULL,
+				&vulkan_display_data->pipeline_layout) != VK_SUCCESS)
+	{
+		p_log_message(P_LOG_ERROR, L"Vulkan General", L"Failed to create pipeline layout!");
+		exit(1);
+	}
+	e_dynarr_deinit(dynamic_states);
+}
+
+
 
 /**
  * p_graphics_vulkan_display_create
@@ -1056,142 +1217,8 @@ void p_graphics_vulkan_display_create(PWindowData *window_data, const PGraphical
 
 	window_data->graphical_display_data = vulkan_display_data;
 
-	// TODO: refactor this to get shader path from config, also put render stuff in renderer
-	char *shader_vert_path = "build/src/platinum/shaders/shader_vert.spv";
-	uint shader_vert_size = p_file_get_size(shader_vert_path);
-	char *shader_vert_data = malloc(shader_vert_size * sizeof(char));
-	p_file_read(shader_vert_path, shader_vert_data, shader_vert_size);
-
-	char *shader_frag_path = "build/src/platinum/shaders/shader_frag.spv";
-	uint shader_frag_size = p_file_get_size(shader_frag_path);
-	char *shader_frag_data = malloc(shader_frag_size * sizeof(char));
-	p_file_read(shader_frag_path, shader_frag_data, shader_frag_size);
-
-
-	if (vulkan_display_data->shaders != NULL)
-		e_dynarr_deinit(vulkan_display_data->shaders);
-	vulkan_display_data->shaders = e_dynarr_init(sizeof (VkShaderModule), 2);
-
-	VkShaderModule vertShaderModule = _create_shader_module(vulkan_display_data, shader_vert_data, shader_vert_size);
-	VkShaderModule fragShaderModule = _create_shader_module(vulkan_display_data, shader_frag_data, shader_frag_size);
-	free(shader_vert_data);
-	free(shader_frag_data);
-
-	e_dynarr_add(vulkan_display_data->shaders, &vertShaderModule);
-	e_dynarr_add(vulkan_display_data->shaders, &fragShaderModule);
-
-	VkPipelineShaderStageCreateInfo vertShaderStageInfo = {0};
-	vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-	vertShaderStageInfo.module = vertShaderModule;
-	vertShaderStageInfo.pName = "main";
-
-	VkPipelineShaderStageCreateInfo fragShaderStageInfo = {0};
-	fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-	fragShaderStageInfo.module = fragShaderModule;
-	fragShaderStageInfo.pName = "main";
-
-	VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
-
-	VkDynamicState dynamicStates[2] = {
-		VK_DYNAMIC_STATE_VIEWPORT,
-		VK_DYNAMIC_STATE_SCISSOR
-	};
-
-	VkPipelineDynamicStateCreateInfo dynamicState = {0};
-	dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-	dynamicState.dynamicStateCount = 2;
-	dynamicState.pDynamicStates = dynamicStates;
-
-	VkPipelineVertexInputStateCreateInfo vertexInputInfo = {0};
-	vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-	vertexInputInfo.vertexBindingDescriptionCount = 0;
-	vertexInputInfo.pVertexBindingDescriptions = NULL; // Optional
-	vertexInputInfo.vertexAttributeDescriptionCount = 0;
-	vertexInputInfo.pVertexAttributeDescriptions = NULL; // Optional
-
-	VkPipelineInputAssemblyStateCreateInfo inputAssembly = {0};
-	inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-	inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-	inputAssembly.primitiveRestartEnable = VK_FALSE;
-
-	VkViewport viewport = {0};
-	viewport.x = 0.0f;
-	viewport.y = 0.0f;
-	viewport.width = (float) vulkan_display_data->swapchain_extent.width;
-	viewport.height = (float) vulkan_display_data->swapchain_extent.height;
-	viewport.minDepth = 0.0f;
-	viewport.maxDepth = 1.0f;
-
-	VkRect2D scissor = {0};
-	scissor.offset = (VkOffset2D){0, 0};
-	scissor.extent = vulkan_display_data->swapchain_extent;
-
-	VkPipelineViewportStateCreateInfo viewportState = {0};
-	viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-	viewportState.viewportCount = 1;
-	viewportState.pViewports = &viewport;
-	viewportState.scissorCount = 1;
-	viewportState.pScissors = &scissor;
-
-	VkPipelineRasterizationStateCreateInfo rasterizer = {0};
-	rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-	rasterizer.depthClampEnable = VK_FALSE;
-	rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
-	rasterizer.lineWidth = 1.0f;
-	rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-	rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
-	rasterizer.depthBiasEnable = VK_FALSE;
-	rasterizer.depthBiasConstantFactor = 0.0f; // Optional
-	rasterizer.depthBiasClamp = 0.0f; // Optional
-	rasterizer.depthBiasSlopeFactor = 0.0f; // Optional
-
-	VkPipelineMultisampleStateCreateInfo multisampling = {0};
-	multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-	multisampling.sampleShadingEnable = VK_FALSE;
-	multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-	multisampling.minSampleShading = 1.0f; // Optional
-	multisampling.pSampleMask = NULL; // Optional
-	multisampling.alphaToCoverageEnable = VK_FALSE; // Optional
-	multisampling.alphaToOneEnable = VK_FALSE; // Optional
-
-	VkPipelineColorBlendAttachmentState colorBlendAttachment = {0};
-	colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
-		| VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-	colorBlendAttachment.blendEnable = VK_FALSE;
-	colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE; // Optional
-	colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
-	colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD; // Optional
-	colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE; // Optional
-	colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
-	colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD; // Optional
-
-	VkPipelineColorBlendStateCreateInfo colorBlending = {0};
-	colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-	colorBlending.logicOpEnable = VK_FALSE;
-	colorBlending.logicOp = VK_LOGIC_OP_COPY; // Optional
-	colorBlending.attachmentCount = 1;
-	colorBlending.pAttachments = &colorBlendAttachment;
-	colorBlending.blendConstants[0] = 0.0f; // Optional
-	colorBlending.blendConstants[1] = 0.0f; // Optional
-	colorBlending.blendConstants[2] = 0.0f; // Optional
-	colorBlending.blendConstants[3] = 0.0f; // Optional
-
-	VkPipelineLayout pipelineLayout;
-	VkPipelineLayoutCreateInfo pipelineLayoutInfo = {0};
-	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	pipelineLayoutInfo.setLayoutCount = 0; // Optional
-	pipelineLayoutInfo.pSetLayouts = NULL; // Optional
-	pipelineLayoutInfo.pushConstantRangeCount = 0; // Optional
-	pipelineLayoutInfo.pPushConstantRanges = NULL; // Optional
-
-	if (vkCreatePipelineLayout(vulkan_display_data->logical_device, &pipelineLayoutInfo, NULL, &pipelineLayout)
-			!= VK_SUCCESS)
-	{
-		p_log_message(P_LOG_ERROR, L"Vulkan General", L"Failed to create pipeline layout!");
-		exit(1);
-	}
+	PThread thread_pipeline = p_thread_create((PThreadFunction) _graphics_vulkan_pipeline_init, vulkan_display_data);
+	p_thread_detach(thread_pipeline);
 }
 
 /**
@@ -1202,18 +1229,19 @@ void p_graphics_vulkan_display_create(PWindowData *window_data, const PGraphical
 void p_graphics_vulkan_display_destroy(PGraphicalDisplayData vulkan_display_data)
 {
 
-	//vkDestroyPipelineLayout(vulkan_display_data->logical_device, pipelineLayout, nullptr);
-	for (uint i = 0; i < vulkan_display_data->shaders->num_items; i++)
+	vkDestroyPipelineLayout(vulkan_display_data->logical_device, vulkan_display_data->pipeline_layout, NULL);
+
+	for (uint i = 0; i < e_dynarr_item_count(vulkan_display_data->shaders); i++)
 		vkDestroyShaderModule(vulkan_display_data->logical_device,
-				E_DYNARR_GET(vulkan_display_data->shaders, VkShaderModule, i), NULL);
+				e_dynarr_get(vulkan_display_data->shaders, VkShaderModule, i), NULL);
 	e_dynarr_deinit(vulkan_display_data->shaders);
 
 	e_dynarr_deinit(vulkan_display_data->compatible_devices);
 	e_dynarr_deinit(vulkan_display_data->swapchain_images);
 
-	for (uint i = 0; i < vulkan_display_data->swapchain_image_views->num_items; i++)
+	for (uint i = 0; i < e_dynarr_item_count(vulkan_display_data->swapchain_image_views); i++)
 		vkDestroyImageView(vulkan_display_data->logical_device,
-				E_DYNARR_GET(vulkan_display_data->swapchain_image_views, VkImageView, i), NULL);
+				e_dynarr_get(vulkan_display_data->swapchain_image_views, VkImageView, i), NULL);
 	e_dynarr_deinit(vulkan_display_data->swapchain_image_views);
 
 	vkDestroySwapchainKHR(vulkan_display_data->logical_device, vulkan_display_data->swapchain, NULL);

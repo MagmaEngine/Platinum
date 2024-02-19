@@ -55,9 +55,9 @@ void p_app_deinit(PAppData *app_data)
 	p_windows_app_deinit(app_data);
 #endif // PLATINUM_PLATFORM_LINUX
 
-	while (app_data->window_data->num_items > 0)
+	while (e_dynarr_item_count(app_data->window_data) > 0)
 	{
-		PWindowData *window_data = E_DYNARR_GET(app_data->window_data, PWindowData *, 0);
+		PWindowData *window_data = e_dynarr_get(app_data->window_data, PWindowData *, 0);
 		p_window_close(window_data);
 		p_thread_join(window_data->event_manager);
 		int index = e_dynarr_find(app_data->window_data, &window_data);

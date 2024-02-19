@@ -10,6 +10,7 @@ typedef CRITICAL_SECTION PMutex;
 #elif defined PLATINUM_PLATFORM_LINUX
 
 #include <pthread.h>
+#include <unistd.h>
 
 struct PThread {
 	pthread_t handle;
@@ -48,7 +49,7 @@ void p_sleep_ms(uint milis)
 	Sleep(milis);
 #endif
 #ifdef PLATINUM_PLATFORM_LINUX
-	usleep(milis*1000);
+	sleep(milis/1000);
 #endif // PLATINUM_PLATFORM_XXXXXX
 }
 

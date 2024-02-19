@@ -1,9 +1,7 @@
 #include "platinum.h"
 #include <windows.h>
 
-#ifdef PLATINUM_BACKEND_VULKAN
-#include "p_graphics_vulkan.h"
-#endif // PLATINUM_BACKEND
+#include "_graphics.h"
 
 // Forward function declarations for internal functions
 void _window_close(PAppData *app_data, PWindowData *window_data);

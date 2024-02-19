@@ -1,11 +1,11 @@
 platinum_srcs = [
-  files('src/p_app.c'),
-  files('src/p_window.c'),
-  files('src/p_graphics.c'),
-  files('src/util/p_debug_mem.c'),
-  files('src/util/p_file.c'),
-  files('src/util/p_log.c'),
-  files('src/util/p_thread.c'),
+  'src/p_app.c',
+  'src/p_window.c',
+  'src/p_graphics.c',
+  'src/util/p_debug_mem.c',
+  'src/util/p_file.c',
+  'src/util/p_log.c',
+  'src/util/p_thread.c',
   ]
 
 platinum_deps = [
@@ -22,7 +22,7 @@ if graphics == 'vulkan'
     '-DPLATINUM_GRAPHICS_VULKAN',
   ]
   platinum_srcs += [
-    files('src/p_graphics_vulkan.c'),
+    'src/p_graphics_vulkan.c',
   ]
   platinum_deps += [
     dependency('vulkan', required : true)
@@ -34,8 +34,8 @@ endif
 # Windows
 if host_machine.system() == 'windows'
   platinum_srcs += [
-    files('src/p_window_win32.c'),
-    files('src/p_app_windows.c'),
+    'src/p_window_win32.c',
+    'src/p_app_windows.c',
     ]
   platinum_c_args += [
     '-DPLATINUM_PLATFORM_WINDOWS',
@@ -44,7 +44,7 @@ if host_machine.system() == 'windows'
 # Linux
 elif host_machine.system() == 'linux'
   platinum_srcs += [
-    files('src/p_app_linux.c'),
+    'src/p_app_linux.c',
     ]
   platinum_deps += [
     dependency('libevdev', required : true),
@@ -62,7 +62,7 @@ elif host_machine.system() == 'linux'
       '-DPLATINUM_DISPLAY_X11',
     ]
     platinum_srcs += [
-      files('src/p_window_x11.c'),
+      'src/p_window_x11.c',
       ]
 # Wayland
   elif display == 'wayland'
@@ -73,7 +73,7 @@ elif host_machine.system() == 'linux'
       '-DPLATINUM_DISPLAY_WAYLAND',
     ]
     platinum_srcs += [
-      files('src/p_window_wayland.c'),
+      'src/p_window_wayland.c',
       ]
   elif display == 'ncurses'
     platinum_deps += [
