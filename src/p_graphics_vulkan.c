@@ -1271,6 +1271,82 @@ void _graphics_vulkan_pipeline_init(PGraphicalDisplayData vulkan_display_data)
 		p_dynarr_add(vulkan_display_data->swapchain_framebuffers, &framebuffer);
 	}
 
+	// Set up command pools
+	VkCommandPoolCreateInfo command_pool_create_info = {0};
+	command_pool_create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	command_pool_create_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+	command_pool_create_info.queueFamilyIndex = vulkan_display_data->queue_family_infos[P_VULKAN_QUEUE_TYPE_GRAPHICS].index;
+
+	if (vkCreateCommandPool(vulkan_display_data->logical_device, &command_pool_create_info, NULL,
+				&vulkan_display_data->command_pool) != VK_SUCCESS)
+	{
+		p_log_message(P_LOG_ERROR, L"Vulkan General", L"Failed to create command pool!");
+		exit(1);
+	}
+
+	// Set up command buffers
+	VkCommandBuffer command_buffer;
+	VkCommandBufferAllocateInfo command_buffer_allocate_info = {0};
+	command_buffer_allocate_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	command_buffer_allocate_info.commandPool = vulkan_display_data->command_pool;
+	command_buffer_allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	command_buffer_allocate_info.commandBufferCount = 1;
+
+	if (vkAllocateCommandBuffers(vulkan_display_data->logical_device, &command_buffer_allocate_info, &command_buffer)
+			!= VK_SUCCESS)
+	{
+		p_log_message(P_LOG_ERROR, L"Vulkan General", L"Failed to allocate command buffers!");
+		exit(1);
+	}
+
+	// Record the command buffer
+	VkCommandBufferBeginInfo command_buffer_begin_info = {0};
+	command_buffer_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	command_buffer_begin_info.flags = 0;
+	command_buffer_begin_info.pInheritanceInfo = NULL;
+
+	if (vkBeginCommandBuffer(command_buffer, &command_buffer_begin_info) != VK_SUCCESS) {
+		p_log_message(P_LOG_ERROR, L"Vulkan General", L"Failed to begin recording command buffer!");
+		exit(1);
+	}
+
+	// Start a render pass
+	VkRenderPassBeginInfo render_pass_begin_info = {0};
+	render_pass_begin_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+	render_pass_begin_info.renderPass = vulkan_display_data->render_pass;
+	render_pass_begin_info.framebuffer = p_dynarr_get(vulkan_display_data->swapchain_framebuffers, VkFramebuffer, 0);
+	render_pass_begin_info.renderArea.offset = (VkOffset2D){0, 0};
+	render_pass_begin_info.renderArea.extent = vulkan_display_data->swapchain_extent;
+	VkClearValue clear_color = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
+	render_pass_begin_info.clearValueCount = 1;
+	render_pass_begin_info.pClearValues = &clear_color;
+	vkCmdBeginRenderPass(command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
+
+	vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vulkan_display_data->graphics_pipeline);
+
+	VkViewport current_viewport = {0};
+	current_viewport.x = 0.0f;
+	current_viewport.y = 0.0f;
+	current_viewport.width = (float) vulkan_display_data->swapchain_extent.width;
+	current_viewport.height = (float) vulkan_display_data->swapchain_extent.height;
+	current_viewport.minDepth = 0.0f;
+	current_viewport.maxDepth = 1.0f;
+	vkCmdSetViewport(command_buffer, 0, 1, &current_viewport);
+
+	VkRect2D current_scissor = {0};
+	current_scissor.offset = (VkOffset2D){0, 0};
+	current_scissor.extent = vulkan_display_data->swapchain_extent;
+	vkCmdSetScissor(command_buffer, 0, 1, &current_scissor);
+
+	vkCmdDraw(command_buffer, 3, 1, 0, 0);
+
+	vkCmdEndRenderPass(command_buffer);
+
+	if (vkEndCommandBuffer(command_buffer) != VK_SUCCESS)
+	{
+		p_log_message(P_LOG_ERROR, L"Vulkan General", L"Failed to record command buffer!");
+		exit(1);
+	}
 }
 
 /**
@@ -1310,6 +1386,8 @@ void p_graphics_vulkan_display_create(PWindowData *window_data, const PGraphical
  */
 void p_graphics_vulkan_display_destroy(PGraphicalDisplayData vulkan_display_data)
 {
+	vkDestroyCommandPool(vulkan_display_data->logical_device, vulkan_display_data->command_pool, NULL);
+
 	for (uint i = 0; i < p_dynarr_count(vulkan_display_data->swapchain_framebuffers); i++)
 		vkDestroyFramebuffer(vulkan_display_data->logical_device,
 				p_dynarr_get(vulkan_display_data->swapchain_framebuffers, VkFramebuffer, i), NULL);

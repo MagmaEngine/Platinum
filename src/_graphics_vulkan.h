@@ -92,6 +92,7 @@ struct PGraphicalDisplayData{
 	VkRenderPass render_pass;
 	VkPipelineLayout pipeline_layout;
 	VkPipeline graphics_pipeline;
+	VkCommandPool command_pool;
 
 	PDynarr *shaders; // contains VkShaderModule. TODO: move this to renderer
 };
