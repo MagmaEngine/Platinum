@@ -1039,6 +1039,40 @@ VkShaderModule _create_shader_module(PGraphicalDisplayData vulkan_display_data, 
  */
 void _graphics_vulkan_pipeline_init(PGraphicalDisplayData vulkan_display_data)
 {
+	// Create render pass
+	VkAttachmentDescription color_attachment_description = {0};
+	color_attachment_description.format = vulkan_display_data->swapchain_format;
+	color_attachment_description.samples = VK_SAMPLE_COUNT_1_BIT;
+	color_attachment_description.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	color_attachment_description.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	color_attachment_description.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	color_attachment_description.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	color_attachment_description.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	color_attachment_description.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+	// Create subpass
+	VkAttachmentReference color_attachment_reference = {0};
+	color_attachment_reference.attachment = 0;
+	color_attachment_reference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	VkSubpassDescription subpass_description = {0};
+	subpass_description.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpass_description.colorAttachmentCount = 1;
+	subpass_description.pColorAttachments = &color_attachment_reference;
+
+	VkRenderPassCreateInfo render_pass_create_info = {0};
+	render_pass_create_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+	render_pass_create_info.attachmentCount = 1;
+	render_pass_create_info.pAttachments = &color_attachment_description;
+	render_pass_create_info.subpassCount = 1;
+	render_pass_create_info.pSubpasses = &subpass_description;
+	if (vkCreateRenderPass(vulkan_display_data->logical_device, &render_pass_create_info, NULL,
+				&vulkan_display_data->render_pass) != VK_SUCCESS)
+	{
+		p_log_message(P_LOG_ERROR, L"Vulkan General", L"Failed to create render pass!");
+		exit(1);
+	}
+
 	// TODO: refactor this to get shader path from config, also put render stuff in renderer
 	char *shader_vert_path = "build/src/platinum/shaders/shader_vert.spv";
 	uint shader_vert_size = p_file_get_size(shader_vert_path);
@@ -1162,7 +1196,7 @@ void _graphics_vulkan_pipeline_init(PGraphicalDisplayData vulkan_display_data)
 
 	VkPipelineColorBlendStateCreateInfo color_blending = {0};
 	color_blending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-	color_blending.logicOpEnable = VK_TRUE;
+	color_blending.logicOpEnable = VK_FALSE;
 	color_blending.logicOp = VK_LOGIC_OP_COPY;
 	color_blending.attachmentCount = 1;
 	color_blending.pAttachments = &color_blend_attachment;
@@ -1186,10 +1220,64 @@ void _graphics_vulkan_pipeline_init(PGraphicalDisplayData vulkan_display_data)
 		p_log_message(P_LOG_ERROR, L"Vulkan General", L"Failed to create pipeline layout!");
 		exit(1);
 	}
+
+	VkGraphicsPipelineCreateInfo pipeline_info = {0};
+	pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	pipeline_info.stageCount = 2;
+	pipeline_info.pStages = shader_stage_infos;
+	pipeline_info.pVertexInputState = &vertex_input_info;
+	pipeline_info.pInputAssemblyState = &input_assembly;
+	pipeline_info.pViewportState = &viewport_state;
+	pipeline_info.pRasterizationState = &rasterizer;
+	pipeline_info.pMultisampleState = &multisampling;
+	pipeline_info.pDepthStencilState = NULL;
+	pipeline_info.pColorBlendState = &color_blending;
+	pipeline_info.pDynamicState = &dynamic_state;
+	pipeline_info.layout = vulkan_display_data->pipeline_layout;
+	pipeline_info.renderPass = vulkan_display_data->render_pass;
+	pipeline_info.subpass = 0;
+	pipeline_info.basePipelineHandle = VK_NULL_HANDLE;
+	pipeline_info.basePipelineIndex = -1;
+
+	if (vkCreateGraphicsPipelines(vulkan_display_data->logical_device, VK_NULL_HANDLE, 1, &pipeline_info, NULL,
+				&vulkan_display_data->graphics_pipeline) != VK_SUCCESS)
+	{
+		p_log_message(P_LOG_ERROR, L"Vulkan General", L"Failed to create graphics pipeline!");
+		exit(1);
+	}
+
 	e_dynarr_deinit(dynamic_states);
+
+	// Set up drawing framebuffers
+	uint item_count = e_dynarr_item_count(vulkan_display_data->swapchain_images);
+
+	if (vulkan_display_data->swapchain_framebuffers != NULL)
+		e_dynarr_deinit(vulkan_display_data->swapchain_framebuffers);
+	vulkan_display_data->swapchain_framebuffers = e_dynarr_init(sizeof (VkFramebuffer), item_count);
+
+	for (uint i = 0; i < item_count; i++)
+	{
+		VkImageView *attachments = e_dynarr_get_arr(vulkan_display_data->swapchain_image_views);
+		VkFramebufferCreateInfo framebuffer_info = {0};
+		framebuffer_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+		framebuffer_info.renderPass = vulkan_display_data->render_pass;
+		framebuffer_info.attachmentCount = 1;
+		framebuffer_info.pAttachments = attachments;
+		framebuffer_info.width = vulkan_display_data->swapchain_extent.width;
+		framebuffer_info.height = vulkan_display_data->swapchain_extent.height;
+		framebuffer_info.layers = 1;
+
+		VkFramebuffer framebuffer;
+		if (vkCreateFramebuffer(vulkan_display_data->logical_device, &framebuffer_info, NULL,
+					&framebuffer) != VK_SUCCESS)
+		{
+			p_log_message(P_LOG_ERROR, L"Vulkan General", L"Failed to create framebuffer!");
+			exit(1);
+		}
+		e_dynarr_add(vulkan_display_data->swapchain_framebuffers, &framebuffer);
+	}
+
 }
-
-
 
 /**
  * p_graphics_vulkan_display_create
@@ -1228,8 +1316,14 @@ void p_graphics_vulkan_display_create(PWindowData *window_data, const PGraphical
  */
 void p_graphics_vulkan_display_destroy(PGraphicalDisplayData vulkan_display_data)
 {
+	for (uint i = 0; i < e_dynarr_item_count(vulkan_display_data->swapchain_framebuffers); i++)
+		vkDestroyFramebuffer(vulkan_display_data->logical_device,
+				e_dynarr_get(vulkan_display_data->swapchain_framebuffers, VkFramebuffer, i), NULL);
+	e_dynarr_deinit(vulkan_display_data->swapchain_framebuffers);
 
+	vkDestroyPipeline(vulkan_display_data->logical_device, vulkan_display_data->graphics_pipeline, NULL);
 	vkDestroyPipelineLayout(vulkan_display_data->logical_device, vulkan_display_data->pipeline_layout, NULL);
+	vkDestroyRenderPass(vulkan_display_data->logical_device, vulkan_display_data->render_pass, NULL);
 
 	for (uint i = 0; i < e_dynarr_item_count(vulkan_display_data->shaders); i++)
 		vkDestroyShaderModule(vulkan_display_data->logical_device,
