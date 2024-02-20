@@ -48,7 +48,7 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 
 	if (window_ptr_data == NULL)
 	{
-		p_log_message(P_LOG_WARNING, L"Phantom", L"Window Data not associated yet.");
+		p_log_message(P_LOG_WARNING, L"Platinum", L"Window Data not associated yet.");
 		return DefWindowProc(hwnd, uMsg, wParam, lParam);
 	} else {
 		window_data = *(PWindowData **)&((char *)window_ptr_data)[sizeof (PAppInstance **)];
@@ -60,7 +60,7 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 		// Expose events
 		case WM_ERASEBKGND:
 		{
-			p_log_message(P_LOG_DEBUG, L"Phantom", L"Erase Background Event triggered.");
+			p_log_message(P_LOG_DEBUG, L"Platinum", L"Erase Background Event triggered.");
 			if (window_data->event_calls->enable_expose && window_data->event_calls->expose != NULL)
 				window_data->event_calls->expose();
 			// Handle erase background message to avoid flickering
@@ -68,7 +68,7 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 		}
 		case WM_PAINT:
 		{
-			p_log_message(P_LOG_DEBUG, L"Phantom", L"Paint Event triggered.");
+			p_log_message(P_LOG_DEBUG, L"Platinum", L"Paint Event triggered.");
 			PAINTSTRUCT ps;
 			HDC hdc = BeginPaint(hwnd, &ps);
 
@@ -86,7 +86,7 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 		// Configure events
 		case WM_DISPLAYCHANGE:
 		{
-			p_log_message(P_LOG_DEBUG, L"Phantom", L"Display Change Event triggered.");
+			p_log_message(P_LOG_DEBUG, L"Platinum", L"Display Change Event triggered.");
 			window_data->display_info->screen_width = GetSystemMetrics(SM_CXSCREEN);
 			window_data->display_info->screen_height = GetSystemMetrics(SM_CYSCREEN);
 			if (window_data->event_calls->enable_configure && window_data->event_calls->configure != NULL)
@@ -95,7 +95,7 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 		}
 		case WM_SIZE:
 		{
-			p_log_message(P_LOG_DEBUG, L"Phantom", L"Size Event triggered.");
+			p_log_message(P_LOG_DEBUG, L"Platinum", L"Size Event triggered.");
 			window_data->width = LOWORD(lParam);
 			window_data->height = HIWORD(lParam);
 			if (window_data->event_calls->enable_configure && window_data->event_calls->configure != NULL)
@@ -105,7 +105,7 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 		}
 		case WM_EXITSIZEMOVE:
 		{
-			p_log_message(P_LOG_DEBUG, L"Phantom", L"Exit Size Move Event triggered.");
+			p_log_message(P_LOG_DEBUG, L"Platinum", L"Exit Size Move Event triggered.");
 			RECT windowRect;
 			GetWindowRect(hwnd, &windowRect);
 
@@ -122,7 +122,7 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 		// Client message events
 		case WM_COPYDATA:
 		{
-			p_log_message(P_LOG_DEBUG, L"Phantom", L"Copy Data Event triggered.");
+			p_log_message(P_LOG_DEBUG, L"Platinum", L"Copy Data Event triggered.");
 			if (window_data->event_calls->enable_client && window_data->event_calls->client != NULL)
 				window_data->event_calls->client();
 			return 0;
@@ -131,7 +131,7 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 		// Focus in events
 		case WM_SETFOCUS:
 		{
-			p_log_message(P_LOG_DEBUG, L"Phantom", L"Set Focus Event triggered.");
+			p_log_message(P_LOG_DEBUG, L"Platinum", L"Set Focus Event triggered.");
 			if (window_data->event_calls->enable_focus_in && window_data->event_calls->focus_in != NULL)
 				window_data->event_calls->focus_in();
 			return 0;
@@ -140,7 +140,7 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 		// Focus out events
 		case WM_KILLFOCUS:
 		{
-			p_log_message(P_LOG_DEBUG, L"Phantom", L"Kill Focus Event triggered.");
+			p_log_message(P_LOG_DEBUG, L"Platinum", L"Kill Focus Event triggered.");
 			if (window_data->event_calls->enable_focus_out && window_data->event_calls->focus_out != NULL)
 				window_data->event_calls->focus_out();
 			return 0;
@@ -149,7 +149,7 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 		// Enter events
 		case WM_MOUSEMOVE:
 		{
-			p_log_message(P_LOG_DEBUG, L"Phantom", L"Mouse Move Event triggered.");
+			p_log_message(P_LOG_DEBUG, L"Platinum", L"Mouse Move Event triggered.");
 			// TODO: make the event only trigger on mouse enter
 			if (window_data->event_calls->enable_enter && window_data->event_calls->enter != NULL)
 				window_data->event_calls->enter();
@@ -159,7 +159,7 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 		// Leave events
 		case WM_MOUSELEAVE:
 		{
-			p_log_message(P_LOG_DEBUG, L"Phantom", L"Mouse Leave Event triggered.");
+			p_log_message(P_LOG_DEBUG, L"Platinum", L"Mouse Leave Event triggered.");
 			if (window_data->event_calls->enable_leave && window_data->event_calls->leave != NULL)
 				window_data->event_calls->leave();
 			return 0;
@@ -168,7 +168,7 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 		// Destroy events
 		case WM_DESTROY:
 		{
-			p_log_message(P_LOG_DEBUG, L"Phantom", L"Destroy Event triggered.");
+			p_log_message(P_LOG_DEBUG, L"Platinum", L"Destroy Event triggered.");
 			DeleteObject(window_data->display_info->hBrush);
 			if (window_data->event_calls->enable_destroy && window_data->event_calls->destroy != NULL)
 				window_data->event_calls->destroy();
@@ -220,7 +220,7 @@ PLATINUM_API void p_win32_window_create(PAppInstance *app_instance, const PWindo
 	display_info->screen_width = GetSystemMetrics(SM_CXSCREEN);
 	display_info->screen_height = GetSystemMetrics(SM_CYSCREEN);
 	display_info->hBrush = CreateSolidBrush(RGB(0, 0, 0));
-	display_info->class_name = L"PhantomWindowClass";
+	display_info->class_name = L"PlatinumWindowClass";
 
 	PWindowData *window_data = malloc(sizeof *window_data);
 	size_t name_size = (wcslen(window_request.name)) * sizeof(wchar_t);
@@ -244,7 +244,7 @@ PLATINUM_API void p_win32_window_create(PAppInstance *app_instance, const PWindo
 	window_class.lpszClassName = display_info->class_name;
 	if (!RegisterClass(&window_class))
 	{
-		p_log_message(P_LOG_ERROR, L"Phantom", L"Window registration failed...");
+		p_log_message(P_LOG_ERROR, L"Platinum", L"Window registration failed...");
 		exit(1);
 	}
 
@@ -259,7 +259,7 @@ PLATINUM_API void p_win32_window_create(PAppInstance *app_instance, const PWindo
 	DWORD result = WaitForSingleObject(window_creation_event, INFINITE);
 	if (result != WAIT_OBJECT_0)
 	{
-		p_log_message(P_LOG_ERROR, L"Phantom", L"Error waiting for window creation.");
+		p_log_message(P_LOG_ERROR, L"Platinum", L"Error waiting for window creation.");
 		exit(1);
 	}
 	CloseHandle(window_creation_event);
@@ -290,10 +290,10 @@ void _win32_window_close(PAppInstance *app_instance, PWindowData *window_data)
 {
 	// If window exists delete it.
 	p_mutex_lock(app_instance->window_mutex);
-	int index = e_dynarr_find(app_instance->window_data, &window_data);
+	int index = p_dynarr_find(app_instance->window_data, &window_data);
 	if (index == -1)
 	{
-		p_log_message(P_LOG_ERROR, L"Phantom", L"Window does not exist...");
+		p_log_message(P_LOG_ERROR, L"Platinum", L"Window does not exist...");
 		exit(1);
 	}
 	p_graphics_display_destroy(window_data->graphical_display_data);
@@ -305,7 +305,7 @@ void _win32_window_close(PAppInstance *app_instance, PWindowData *window_data)
 		free(window_data);
 		p_thread_detach(p_thread_self());
 	}
-	e_dynarr_remove_unordered(app_instance->window_data, index);
+	p_dynarr_remove_unordered(app_instance->window_data, index);
 	p_mutex_unlock(app_instance->window_mutex);
 }
 
@@ -332,7 +332,7 @@ PThreadResult WINAPI _win32_window_event_manage(PThreadArguments args)
 			NULL);	 // Additional application data
 
 	if (window_data->display_info->hwnd == NULL) {
-		p_log_message(P_LOG_ERROR, L"Phantom", L"Cannot open window");
+		p_log_message(P_LOG_ERROR, L"Platinum", L"Cannot open window");
 		exit(1);
 	}
 
@@ -353,14 +353,14 @@ PThreadResult WINAPI _win32_window_event_manage(PThreadArguments args)
 		break;
 
 		case P_DISPLAY_MAX:
-			p_log_message(P_LOG_WARNING, L"Phantom", L"P_DISPLAY_MAX is not a valid window type");
+			p_log_message(P_LOG_WARNING, L"Platinum", L"P_DISPLAY_MAX is not a valid window type");
 			exit(1);
 	}
 
 	p_graphics_display_create(window_data, app_data->graphical_app_data, &window_request.graphical_display_request);
 
 	p_mutex_lock(app_instance->window_mutex);
-	e_dynarr_add(app_instance->window_data, &window_data);
+	p_dynarr_add(app_instance->window_data, &window_data);
 	p_mutex_unlock(app_instance->window_mutex);
 
 	SetWindowLongPtr(window_data->display_info->hwnd, GWLP_USERDATA, (LONG_PTR)args);

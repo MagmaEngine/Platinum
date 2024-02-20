@@ -37,7 +37,7 @@ void p_debug_memory_init(PMutex *mutex)
 	p_alloc_mutex_lock = p_mutex_lock;
 	p_alloc_mutex_unlock = p_mutex_unlock;
 #else
-	E_UNUSED(mutex);
+	P_UNUSED(mutex);
 #endif
 }
 
@@ -301,7 +301,7 @@ void p_debug_mem_print(uint min_allocs)
 	if (p_alloc_mutex != NULL)
 		p_alloc_mutex_unlock(p_alloc_mutex);
 #else
-	E_UNUSED(min_allocs);
+	P_UNUSED(min_allocs);
 #endif
 }
 

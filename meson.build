@@ -3,14 +3,13 @@ platinum_srcs = [
   'src/p_window.c',
   'src/p_graphics.c',
   'src/util/p_debug_mem.c',
+  'src/util/p_dynarr.c',
   'src/util/p_file.c',
   'src/util/p_log.c',
   'src/util/p_thread.c',
   ]
 
-platinum_deps = [
-  dep_libenigma,
-  ]
+platinum_deps = []
 
 platinum_c_args = [
   '-D_PLATINUM_INTERNAL',
@@ -30,7 +29,7 @@ if graphics == 'vulkan'
 endif
 
 
-## Phantom Window Settings
+## Platinum Window Settings
 # Windows
 if host_machine.system() == 'windows'
   platinum_srcs += [
@@ -97,6 +96,16 @@ libplatinum = library(
   install : true)
 
 subdir('shaders')
+
+# Tests
+test_p_dynarr = executable('test_p_dynarr',
+  'test/test_p_dynarr.c',
+  sources : platinum_srcs,
+  dependencies : platinum_deps,
+  c_args : platinum_c_args,
+  include_directories : include_directories('include'),
+  install : false)
+test('test_p_dynarr', test_p_dynarr)
 
 dep_libplatinum = declare_dependency(
   include_directories: include_directories('include'),

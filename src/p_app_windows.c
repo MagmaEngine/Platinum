@@ -12,8 +12,8 @@
  */
 void p_windows_app_init(PAppData *app_data, PAppRequest app_request)
 {
-	E_UNUSED(app_data);
-	E_UNUSED(app_request);
+	P_UNUSED(app_data);
+	P_UNUSED(app_request);
 
 	// Makes a console
 	AllocConsole();
@@ -38,7 +38,7 @@ void p_windows_app_init(PAppData *app_data, PAppRequest app_request)
  */
 void p_windows_app_deinit(PAppData *app_data)
 {
-	E_UNUSED(app_data);
+	P_UNUSED(app_data);
 	//FreeConsole(); // Closes the log console. Also ends the application.
 	//Not needed since console closes on its own anyways.
 }

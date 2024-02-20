@@ -16,7 +16,7 @@ struct udev *udev;
 //{
 //	udev = udev_new();
 //	if (!udev) {
-//		p_log_message(P_LOG_ERROR, L"Phantom", L"Failed to initialize udev");
+//		p_log_message(P_LOG_ERROR, L"Platinum", L"Failed to initialize udev");
 //		exit(EXIT_FAILURE);
 //	}
 //	PDeviceManager *input_manager = malloc(sizeof * input_manager);

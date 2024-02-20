@@ -1,5 +1,4 @@
 #include "platinum.h"
-#include <enigma.h>
 #include <stdlib.h>
 #include <string.h>
 #include <wchar.h>
@@ -58,10 +57,10 @@ void _window_close(PAppData *app_data, PWindowData *window_data)
 {
 	// If window exists delete it.
 	p_mutex_lock(app_data->window_mutex);
-	int index = e_dynarr_find(app_data->window_data, &window_data);
+	int index = p_dynarr_find(app_data->window_data, &window_data);
 	if (index == -1)
 	{
-		p_log_message(P_LOG_ERROR, L"Phantom", L"Window does not exist...");
+		p_log_message(P_LOG_ERROR, L"Platinum", L"Window does not exist...");
 		exit(1);
 	}
 	p_graphics_display_destroy(window_data->graphical_display_data);
@@ -82,7 +81,7 @@ void _window_close(PAppData *app_data, PWindowData *window_data)
 		free(window_data);
 		p_thread_detach(p_thread_self());
 	}
-	e_dynarr_remove_unordered(app_data->window_data, index);
+	p_dynarr_remove_unordered(app_data->window_data, index);
 	p_mutex_unlock(app_data->window_mutex);
 }
 

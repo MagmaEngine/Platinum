@@ -1,13 +1,57 @@
 #ifndef PLATINUM_UTIL_H
 #define PLATINUM_UTIL_H
 
+#include <stdlib.h>
+#include <stdint.h>
 #include <stdbool.h>
 #include <wchar.h>
+
+#ifndef NULL
+#define NULL (void*)(0)
+#endif
 
 #ifndef _UINT
 #define _UINT
 typedef unsigned int uint;
 #endif // _UINT
+
+#ifndef P_UNUSED
+#define P_UNUSED(x) (void)(x)
+#endif
+
+#ifdef PLATINUM_DOUBLE_PRECISION
+typedef double PFloat;
+#else
+typedef float PFloat;
+#endif // PLATINUM_DOUBLE_PRECISION
+
+// ------------ Integer math --------------
+#ifndef P_MAX
+#define P_MAX(a, b) ((a) > (b) ? (a) : (b))
+#endif // P_MAX
+#ifndef P_MIN
+#define P_MIN(a, b) ((a) < (b) ? (a) : (b))
+#endif // P_MIN
+
+// ----------- Dynamic Array -----------
+#define P_PTR_CAST(type, val) &(type){val}
+#define P_VPTR_CAST(type, val) (void *)&(type){val}
+
+typedef struct PDynarr PDynarr;
+
+PDynarr *p_dynarr_init(const size_t item_size, const uint item_cap);
+PDynarr *p_dynarr_init_arr(const size_t item_size, const uint item_cap, const void * const arr);
+void p_dynarr_deinit(PDynarr * const p);
+void p_dynarr_add(PDynarr * const p, const void * const item);
+void p_dynarr_append(PDynarr * const dest, const PDynarr * const src);
+int p_dynarr_set(PDynarr * const p, const uint index, const void * const item);
+int p_dynarr_find(const PDynarr * const d, const void * const item);
+int p_dynarr_remove_unordered(PDynarr * const p, const uint index);
+int p_dynarr_remove_ordered(PDynarr * const p, const uint index);
+uint p_dynarr_count(const PDynarr * const p);
+size_t p_dynarr_item_size(const PDynarr * const p);
+void *p_dynarr_get_arr(const PDynarr * const p);
+#define p_dynarr_get(dynarr, type, index) ((type *)p_dynarr_get_arr(dynarr))[index]
 
 // ------------- Threads ---------------
 struct PThread;

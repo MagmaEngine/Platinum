@@ -1,5 +1,4 @@
 #include "platinum.h"
-#include <enigma.h>
 #include <stdlib.h>
 #include <string.h>
 #include <wchar.h>
@@ -25,7 +24,7 @@ static xcb_atom_t p_x11_generate_atom(xcb_connection_t *connection, const char *
 	xcb_intern_atom_cookie_t cookie = xcb_intern_atom(connection, 0, strlen(atom_name), atom_name);
 	xcb_intern_atom_reply_t *reply = xcb_intern_atom_reply(connection, cookie, NULL);
 	if (!reply) {
-		p_log_message(P_LOG_ERROR, L"Phantom", L"Could not get atom reply...");
+		p_log_message(P_LOG_ERROR, L"Platinum", L"Could not get atom reply...");
 		exit(1);
 	}
 	xcb_atom_t atom = reply->atom;
@@ -95,7 +94,7 @@ void p_x11_window_create(PAppData *app_data, const PWindowRequest window_request
 	// Check if the connection was successful
 	if (xcb_connection_has_error(connection))
 	{
-		p_log_message(P_LOG_ERROR, L"Phantom", L"Unable to open the connection to the X server");
+		p_log_message(P_LOG_ERROR, L"Platinum", L"Unable to open the connection to the X server");
 		exit(1);
 	}
 
@@ -130,7 +129,7 @@ void p_x11_window_create(PAppData *app_data, const PWindowRequest window_request
 	{
 		if (display_info->atoms[i] == XCB_ATOM_NONE)
 		{
-			p_log_message(P_LOG_ERROR, L"Phantom", L"XCB atoms not initialized. Aborting...");
+			p_log_message(P_LOG_ERROR, L"Platinum", L"XCB atoms not initialized. Aborting...");
 			exit(1);
 		}
 	}
@@ -141,10 +140,10 @@ void p_x11_window_create(PAppData *app_data, const PWindowRequest window_request
 	PWindowData *window_data = malloc(sizeof *window_data);
 	window_data->name = malloc((wcslen(window_request.name)+1) * sizeof(wchar_t));
 	wcscpy(window_data->name, window_request.name);
-	window_data->x = E_MIN(E_MAX(window_request.x, 0), screen->width_in_pixels);
-	window_data->y = E_MIN(E_MAX(window_request.y, 0), screen->height_in_pixels);
-	window_data->width = E_MIN(E_MAX(window_request.width, 1), screen->width_in_pixels);
-	window_data->height = E_MIN(E_MAX(window_request.height, 1), screen->width_in_pixels);
+	window_data->x = P_MIN(P_MAX(window_request.x, 0), screen->width_in_pixels);
+	window_data->y = P_MIN(P_MAX(window_request.y, 0), screen->height_in_pixels);
+	window_data->width = P_MIN(P_MAX(window_request.width, 1), screen->width_in_pixels);
+	window_data->height = P_MIN(P_MAX(window_request.height, 1), screen->width_in_pixels);
 	window_data->display_type = window_request.display_type;
 	window_data->interact_type = window_request.interact_type;
 	window_data->display_info = display_info;
@@ -214,14 +213,14 @@ void p_x11_window_create(PAppData *app_data, const PWindowRequest window_request
 		break;
 
 		case P_DISPLAY_MAX:
-			p_log_message(P_LOG_WARNING, L"Phantom", L"P_DISPLAY_MAX is not a valid window type...");
+			p_log_message(P_LOG_WARNING, L"Platinum", L"P_DISPLAY_MAX is not a valid window type...");
 			exit(1);
 	}
 
 	p_graphics_display_create(window_data, app_data->graphical_app_data, &window_request.graphical_display_request);
 
 	p_mutex_lock(app_data->window_mutex);
-	e_dynarr_add(app_data->window_data, &window_data);
+	p_dynarr_add(app_data->window_data, &window_data);
 	p_mutex_unlock(app_data->window_mutex);
 
 	// Start the window event manager
@@ -277,7 +276,7 @@ PThreadResult _x11_window_event_manage(PThreadArguments args)
 		xcb_generic_event_t *event = xcb_wait_for_event(display_info->connection);
 		if (!event)
 		{
-			p_log_message(P_LOG_WARNING, L"Phantom", L"Event was null...");
+			p_log_message(P_LOG_WARNING, L"Platinum", L"Event was null...");
 			p_mutex_lock(app_data->window_mutex);
 			if (window_data->status == P_WINDOW_STATUS_ALIVE)
 				window_data->status = P_WINDOW_STATUS_CLOSE;
@@ -291,7 +290,7 @@ PThreadResult _x11_window_event_manage(PThreadArguments args)
 			case XCB_EXPOSE:
 			{
 				xcb_expose_event_t *expose_event = (xcb_expose_event_t *)event;
-				E_UNUSED(expose_event);
+				P_UNUSED(expose_event);
 				// TODO: redraw (only new part?)
 				if (event_calls->enable_expose && event_calls->expose != NULL)
 					event_calls->expose();
@@ -311,7 +310,7 @@ PThreadResult _x11_window_event_manage(PThreadArguments args)
 			case XCB_PROPERTY_NOTIFY:
 			{
 				xcb_property_notify_event_t *property_notify_event = (xcb_property_notify_event_t *)event;
-				E_UNUSED(property_notify_event);
+				P_UNUSED(property_notify_event);
 
 				xcb_get_property_cookie_t property_cookie_state = xcb_get_property(display_info->connection, 0,
 						display_info->window, display_info->atoms[P_ATOM_NET_WM_STATE], XCB_ATOM_ANY, 0, 1024);
@@ -361,7 +360,7 @@ PThreadResult _x11_window_event_manage(PThreadArguments args)
 			case XCB_CLIENT_MESSAGE:
 			{
 				xcb_client_message_event_t *message_event = (xcb_client_message_event_t *)event;
-				E_UNUSED(message_event);
+				P_UNUSED(message_event);
 				if (event_calls->enable_client && event_calls->client != NULL)
 					event_calls->client();
 				break;
@@ -369,7 +368,7 @@ PThreadResult _x11_window_event_manage(PThreadArguments args)
 			case XCB_FOCUS_IN:
 			{
 				xcb_focus_in_event_t *focus_in_event = (xcb_focus_in_event_t *)event;
-				E_UNUSED(focus_in_event);
+				P_UNUSED(focus_in_event);
 				if (event_calls->enable_focus_in && event_calls->focus_in != NULL)
 					event_calls->focus_in();
 				break;
@@ -377,7 +376,7 @@ PThreadResult _x11_window_event_manage(PThreadArguments args)
 			case XCB_FOCUS_OUT:
 			{
 				xcb_focus_out_event_t *focus_out_event = (xcb_focus_out_event_t *)event;
-				E_UNUSED(focus_out_event);
+				P_UNUSED(focus_out_event);
 				if (event_calls->enable_focus_out && event_calls->focus_out != NULL)
 					event_calls->focus_out();
 				break;
@@ -385,7 +384,7 @@ PThreadResult _x11_window_event_manage(PThreadArguments args)
 			case XCB_ENTER_NOTIFY:
 			{
 				xcb_enter_notify_event_t *enter_notify_event = (xcb_enter_notify_event_t *)event;
-				E_UNUSED(enter_notify_event);
+				P_UNUSED(enter_notify_event);
 				if (event_calls->enable_enter && event_calls->enter != NULL)
 					event_calls->enter();
 				break;
@@ -393,7 +392,7 @@ PThreadResult _x11_window_event_manage(PThreadArguments args)
 			case XCB_LEAVE_NOTIFY:
 			{
 				xcb_leave_notify_event_t *leave_notify_event = (xcb_leave_notify_event_t *)event;
-				E_UNUSED(leave_notify_event);
+				P_UNUSED(leave_notify_event);
 				if (event_calls->enable_leave && event_calls->leave != NULL)
 					event_calls->leave();
 				break;
@@ -401,7 +400,7 @@ PThreadResult _x11_window_event_manage(PThreadArguments args)
 			case XCB_DESTROY_NOTIFY:
 			{
 				xcb_destroy_notify_event_t *destroy_notify_event = (xcb_destroy_notify_event_t *)event;
-				E_UNUSED(destroy_notify_event);
+				P_UNUSED(destroy_notify_event);
 
 				if (event_calls->enable_destroy && event_calls->destroy != NULL)
 					event_calls->destroy();

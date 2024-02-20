@@ -24,7 +24,7 @@ PAppData *p_app_init(PAppRequest app_request)
 	app_data->window_mutex = p_mutex_init();
 
 	// create the window array
-	app_data->window_data = e_dynarr_init(sizeof (PWindowData *), 1);
+	app_data->window_data = p_dynarr_init(sizeof (PWindowData *), 1);
 
 	// create the input manager
 	//app_data->input_manager = p_event_init();
@@ -55,18 +55,18 @@ void p_app_deinit(PAppData *app_data)
 	p_windows_app_deinit(app_data);
 #endif // PLATINUM_PLATFORM_LINUX
 
-	while (e_dynarr_item_count(app_data->window_data) > 0)
+	while (p_dynarr_count(app_data->window_data) > 0)
 	{
-		PWindowData *window_data = e_dynarr_get(app_data->window_data, PWindowData *, 0);
+		PWindowData *window_data = p_dynarr_get(app_data->window_data, PWindowData *, 0);
 		p_window_close(window_data);
 		p_thread_join(window_data->event_manager);
-		int index = e_dynarr_find(app_data->window_data, &window_data);
+		int index = p_dynarr_find(app_data->window_data, &window_data);
 		free(window_data->event_calls);
 		free(window_data->name);
 		free(window_data);
-		e_dynarr_remove_unordered(app_data->window_data, index);
+		p_dynarr_remove_unordered(app_data->window_data, index);
 	}
-	e_dynarr_deinit(app_data->window_data);
+	p_dynarr_deinit(app_data->window_data);
 	p_mutex_destroy(app_data->window_mutex);
 
 	//p_event_deinit(app_data->input_manager);

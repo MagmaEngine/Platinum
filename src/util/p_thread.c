@@ -237,7 +237,7 @@ void p_thread_detach(PThread thread)
 {
 #ifdef PLATINUM_PLATFORM_WINDOWS
 	// Windows threads are always detached
-	E_UNUSED(thread);
+	P_UNUSED(thread);
 #endif
 #ifdef PLATINUM_PLATFORM_LINUX
 	int result = pthread_detach(thread->handle);

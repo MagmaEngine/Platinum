@@ -10,8 +10,8 @@
  */
 void p_linux_app_init(PAppData *app_data, PAppRequest app_request)
 {
-	E_UNUSED(app_data);
-	E_UNUSED(app_request);
+	P_UNUSED(app_data);
+	P_UNUSED(app_request);
 }
 
 /**
@@ -22,5 +22,5 @@ void p_linux_app_init(PAppData *app_data, PAppRequest app_request)
  */
 void p_linux_app_deinit(PAppData *app_data)
 {
-	E_UNUSED(app_data);
+	P_UNUSED(app_data);
 }

@@ -36,7 +36,7 @@ struct PAppRequest {
  */
 struct PAppData {
 	PAppConfig *app_config;
-	EDynarr *window_data; // Array of (PWindowData *)
+	PDynarr *window_data; // Array of (PWindowData *)
 	//PDeviceManager *input_manager;
 	PMutex window_mutex;
 	PGraphicalAppData graphical_app_data;

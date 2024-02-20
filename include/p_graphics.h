@@ -1,7 +1,7 @@
 #ifndef _PLATINUM_GRAPHICS_H
 #define _PLATINUM_GRAPHICS_H
 
-#include <enigma.h>
+#include <stdbool.h>
 
 // External Forward Declarations
 typedef struct PWindowData PWindowData;

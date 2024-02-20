@@ -13,9 +13,9 @@
 // * TODO: use me
 // */
 //struct PDeviceManager {
-//	EDynarr *udev_monitors;
-//	EDynarr *libevs;
-//	EDynarr *libev_uinputs;
+//	PDynarr *udev_monitors;
+//	PDynarr *libevs;
+//	PDynarr *libev_uinputs;
 //};
 
 

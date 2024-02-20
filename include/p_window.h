@@ -1,7 +1,6 @@
 #ifndef _PLATINUM_WINDOW_H
 #define _PLATINUM_WINDOW_H
 
-#include <enigma.h>
 #include "p_graphics.h"
 #include "p_util.h"
 #include <wchar.h>

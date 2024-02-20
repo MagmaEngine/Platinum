@@ -2,7 +2,7 @@
 #define PLATINUM_GRAPHICS_VULKAN_H
 
 #include <vulkan/vulkan.h>
-#include <enigma.h>
+#include "p_util.h"
 
 #ifdef PLATINUM_DISPLAY_X11
 #include <xcb/xcb.h>
@@ -17,8 +17,8 @@
  * This struct is made with PGraphicalAppRequest
  */
 typedef struct {
-	EDynarr *required_extensions; // contains char *
-	EDynarr *required_layers; // contains char *
+	PDynarr *required_extensions; // contains char *
+	PDynarr *required_layers; // contains char *
 } PVulkanAppRequest;
 
 /**
@@ -32,8 +32,8 @@ typedef struct {
 
 	VkQueueFlags required_queue_flags;
 	VkPhysicalDeviceFeatures required_features;
-	EDynarr *required_extensions; // contains char *
-	EDynarr *required_layers; // contains char *
+	PDynarr *required_extensions; // contains char *
+	PDynarr *required_layers; // contains char *
 } PVulkanDisplayRequest;
 
 /**
@@ -80,20 +80,20 @@ struct PGraphicalDisplayData{
 	VkSurfaceKHR surface;
 	VkPhysicalDevice current_physical_device;
 	VkDevice logical_device;
-	EDynarr *compatible_devices; // contains VkPhysicalDevice
+	PDynarr *compatible_devices; // contains VkPhysicalDevice
 	PVulkanQueueFamilyInfo queue_family_infos[P_VULKAN_QUEUE_TYPE_MAX];
 	VkInstance instance; // non-malloced pointer to PVulkanAppData->instance
 	VkSwapchainKHR swapchain;
 	VkExtent2D swapchain_extent;
 	VkFormat swapchain_format;
-	EDynarr *swapchain_images; // contains VkImage
-	EDynarr *swapchain_image_views; // contains VkImageView
-	EDynarr *swapchain_framebuffers; // contains VkFramebuffer
+	PDynarr *swapchain_images; // contains VkImage
+	PDynarr *swapchain_image_views; // contains VkImageView
+	PDynarr *swapchain_framebuffers; // contains VkFramebuffer
 	VkRenderPass render_pass;
 	VkPipelineLayout pipeline_layout;
 	VkPipeline graphics_pipeline;
 
-	EDynarr *shaders; // contains VkShaderModule. TODO: move this to renderer
+	PDynarr *shaders; // contains VkShaderModule. TODO: move this to renderer
 };
 
 /**
