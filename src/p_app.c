@@ -1,6 +1,5 @@
-#include "platinum.h"
+#include "p_app.h"
 #include <locale.h>
-#include <stdio.h>
 
 PMutex debug_memory_mutex;
 

@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "platinum.h"
+#include "p_util.h"
 
 /**
  * p_file_exists
